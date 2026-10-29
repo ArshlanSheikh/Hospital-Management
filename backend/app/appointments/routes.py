@@ -82,3 +82,17 @@ def update_appointment_status(appointment_id):
     data = schema.load(request.get_json() or {})
     result = AppointmentService.update_status(appointment_id, user, data["status"])
     return success_response(data=result, message="Appointment status updated successfully")
+
+
+@appointments_bp.route("/<appointment_id>/reschedule", methods=["POST"])
+@jwt_required()
+def reschedule_appointment(appointment_id):
+    user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    new_date = data.get("appointment_date")
+    new_start_time = data.get("start_time")
+    if not new_date or not new_start_time:
+        from app.common.responses import error_response
+        return error_response(code="VALIDATION_ERROR", message="appointment_date and start_time are required", status_code=400)
+    result = AppointmentService.reschedule_appointment(appointment_id, user, new_date, new_start_time)
+    return success_response(data=result, message="Appointment rescheduled successfully")

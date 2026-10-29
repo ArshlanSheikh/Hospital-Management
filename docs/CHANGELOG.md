@@ -4,6 +4,42 @@ All notable changes to the Doctor Consultation and Appointment Booking Platform 
 
 ---
 
+## [Phase V2: Online Consultation and Essential Advanced Features] - 2026-10-29
+
+### Added
+- **Online Video Consultation (WebRTC / Jitsi Meet Integration)**:
+  - Secure, deterministic cryptographic room generation: `medipulse_<appointment_number>_<token>`.
+  - Real-time pre-call lobby with local camera/microphone media preview and device check.
+  - Interactive Jitsi Meet embedded frame with video, audio, screen share, and chat controls.
+  - Real-time consultation session tracking (`scheduled` -> `in_progress` -> `completed`).
+  - Integrated in-call prescription builder for doctors during active consultations.
+- **Razorpay Online Payments Integration**:
+  - Server-side Razorpay order generation in Indian Paise (`INR`).
+  - Cryptographic server-side HMAC SHA256 signature verification (`order_id|payment_id`).
+  - Idempotent payment recording and appointment confirmation.
+  - Interactive modal with direct Razorpay checkout and Instant Sandbox payment simulation.
+  - Printable payment receipt with transaction ID and payment breakdown.
+- **Digital Medical Prescriptions**:
+  - Strict doctor-only authorization for prescription issuance on valid appointments.
+  - Unique prescription identification numbering: `RX-YYYYMMDD-XXXXXX`.
+  - Comprehensive clinical data: Vitals (BP, pulse, temp, weight), diagnosis, structured medications (dosage, frequency, duration, instructions), lab tests, advice, and follow-up date.
+  - Official print-ready prescription cards with CSS `@media print` formatting.
+  - Dedicated prescription archives for patients (`/patient/prescriptions`) and doctors (`/doctor/prescriptions`).
+- **Real-Time In-App Notifications**:
+  - Unread notification counter badge in navigation header with interactive dropdown.
+  - Automated notification triggers for booking, cancellation, rescheduling, prescription issuance, and payment receipt.
+  - 5-minute deduplication guard preventing redundant alerts.
+  - Mark-as-read and mark-all-read capabilities.
+- **Appointment Rescheduling**:
+  - Slot conflict detection and doctor availability schedule boundary validation.
+  - Interactive Reschedule Modal with real-time slot generation for selected dates.
+  - Automated notification dispatch to doctor and patient upon rescheduling.
+- **Testing & Verification**:
+  - Added 17 automated tests across `test_notifications.py`, `test_payments.py`, `test_prescriptions.py`, `test_consultations.py`, and `test_reschedule.py`.
+  - Total test suite expanded to 35 tests, running at 100% pass rate.
+
+---
+
 ## [Phase V1: Core Application and Appointment Booking] - 2026-10-29
 
 ### Added

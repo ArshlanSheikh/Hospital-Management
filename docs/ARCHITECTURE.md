@@ -1,4 +1,4 @@
-# System Architecture & Design Document (Phase V1)
+# System Architecture & Design Document (Phase V1 & V2)
 
 ## 1. Architectural Style: Modular Monolith with MongoDB
 
@@ -19,7 +19,11 @@ MediPulse is built as a clean, decoupled client-server architecture consisting o
    ├── /api/v1/auth
    ├── /api/v1/doctors
    ├── /api/v1/patients
-   ├── /api/v1/appointments
+   ├── /api/v1/appointments (Booking & Rescheduling)
+   ├── /api/v1/consultations (WebRTC / Video Sessions)
+   ├── /api/v1/payments (Razorpay Gateway & Verification)
+   ├── /api/v1/prescriptions (Digital Rx Management)
+   ├── /api/v1/notifications (In-App Event Dispatcher)
    └── /api/v1/admin
        |
  [Service Layer]
@@ -27,6 +31,10 @@ MediPulse is built as a clean, decoupled client-server architecture consisting o
    ├── DoctorService
    ├── PatientService
    ├── AppointmentService
+   ├── ConsultationService
+   ├── PaymentService
+   ├── PrescriptionService
+   ├── NotificationService
    └── AdminService
        |
  [Repository & PyMongo Data Access Layer]
@@ -35,7 +43,10 @@ MediPulse is built as a clean, decoupled client-server architecture consisting o
    ├── users
    ├── doctor_profiles
    ├── patient_profiles
-   └── appointments
+   ├── appointments
+   ├── payments
+   ├── prescriptions
+   └── notifications
 ```
 
 ---
@@ -44,79 +55,78 @@ MediPulse is built as a clean, decoupled client-server architecture consisting o
 
 ### 2.1 Strict 3-Role Access Model
 The application enforces three distinct roles throughout the authentication, permission decorators, and database models:
-- **`patient`**: Books appointments, views medical consultations, edits profile.
-- **`doctor`**: Configures weekly consulting availability, views scheduled appointments, edits profile and consultation fee.
-- **`admin`**: Verifies and credentials doctor accounts, monitors platform metrics, and oversees appointments.
+- **`patient`**: Books consultations, pays via Razorpay, joins video rooms, views/prints prescriptions, manages profile.
+- **`doctor`**: Configures weekly availability, joins video sessions, issues digital prescriptions (Rx), views appointments.
+- **`admin`**: Verifies and credentials doctor accounts, monitors platform metrics, and oversees appointments and transactions.
 *(Hospital entities, departments, and hospital admin accounts are strictly excluded.)*
 
 ### 2.2 Flask Application Factory (`create_app`)
 - Located in [backend/app/__init__.py](file:///e:/office%20project/Hospital-Management/backend/app/__init__.py).
 - Accepts configuration names (`development`, `testing`, `production`).
-- Initializes extensions (`MongoManager`, `JWTManager`, `CORS`) and sets up database indexes automatically on startup.
+- Initializes extensions (`MongoManager`, `JWTManager`, `CORS`) and automatically creates collection indexes on startup.
 - Registers modular blueprints and global error handlers (`AppError`, `DuplicateKeyError`, `ValidationError`).
 - Provides clean isolation for automated Pytest tests against a separate testing database (`hospital_consultation_test`).
 
 ### 2.3 MongoDB Connection & Index Management (`MongoManager`)
 - Located in [backend/app/extensions.py](file:///e:/office%20project/Hospital-Management/backend/app/extensions.py).
 - Uses PyMongo's `MongoClient` with automatic connection pooling.
-- Runs `init_db_indexes(db)` on application startup to ensure:
+- Creates indexes on startup:
   - `users.email` (Unique)
   - `doctor_profiles.user_id` (Unique)
   - `patient_profiles.user_id` (Unique)
-  - `appointments` Partial compound unique index on `(doctor_id, appointment_date, start_time)` for active bookings.
-
-### 2.4 Service Layer Pattern
-Business logic is strictly separated from HTTP controllers (routes):
-- **Controllers** handle HTTP request parsing, header extraction, validation, and invoking service methods.
-- **Services** encapsulate core domain rules (e.g., verifying doctor credentials before public listing, checking schedule bounds, deriving consultation fees).
-- **Repositories** handle PyMongo query composition and document transformation.
+  - `appointments` Partial compound unique index on `(doctor_id, appointment_date, start_time)` for active bookings
+  - `prescriptions.prescription_number` (Unique)
+  - `payments.order_id` (Unique)
+  - `notifications.(user_id, created_at)`
 
 ---
 
-## 3. Concurrency & Double-Booking Prevention
+## 3. Phase V2 Subsystems Architecture
 
-### 3.1 The Challenge
-In a healthcare consultation platform, two patients concurrently attempting to book the exact same doctor at the same date and time slot must never result in an overlapping booking.
+### 3.1 Online Video Consultation Architecture (WebRTC / Jitsi Meet)
+- **Zero Placeholder Guarantee**: Provides real, working video and audio conferencing without simulated mock buttons.
+- **Session Authorization**:
+  - Endpoint `GET /api/v1/consultations/<appointment_id>/session` verifies:
+    1. Caller is the assigned doctor or the booking patient.
+    2. Consultation type is `video` or `online`.
+    3. Status is active (not cancelled or rejected).
+- **Deterministic Cryptographic Room IDs**:
+  - Room names are generated using HMAC/SHA256 (`medipulse_consult_<appt_number>_<hash>`) ensuring that only authorized participants join the private consultation session.
+- **Hardware Pre-Check Lobby**:
+  - In-browser camera and microphone diagnostics using `navigator.mediaDevices.getUserMedia` before entering call.
+- **Lifecycle Management**:
+  - Tracks session state: `scheduled` -> `in_progress` -> `completed` / `missed`.
+  - Doctor can issue digital prescriptions directly from the active call screen and conclude the consultation.
 
-### 3.2 MongoDB Database-Level Guarantee
-MediPulse prevents double booking at the database level using a **Partial Unique Compound Index**:
+### 3.2 Online Payments Architecture (Razorpay)
+- **Server-Side Order Generation**:
+  - `POST /api/v1/payments/create-order` creates order via Razorpay API in INR (paise = fee * 100).
+- **Cryptographic Signature Verification**:
+  - Frontend never dictates payment confirmation.
+  - `POST /api/v1/payments/verify` computes HMAC SHA256 of `order_id|payment_id` using server-side `RAZORPAY_KEY_SECRET`.
+  - Prevents duplicate submission and ensures tamper-proof verification.
+- **State Transition**:
+  - Transitions appointment `payment_status` to `completed` and confirms booking.
+  - Creates transaction receipt record in `payments` collection.
 
-```python
-db.appointments.create_index(
-    [
-        ("doctor_id", ASCENDING),
-        ("appointment_date", ASCENDING),
-        ("start_time", ASCENDING)
-    ],
-    unique=True,
-    name="idx_unique_active_doctor_slot",
-    partialFilterExpression={
-        "appointment_status": {"$in": ["pending", "confirmed"]}
-    }
-)
-```
+### 3.3 Digital Prescriptions (Rx) Architecture
+- **Medical Compliance**:
+  - Prescriptions can only be created by the verified doctor assigned to the consultation (`POST /api/v1/prescriptions`).
+  - Generates immutable clinical identifier (`RX-YYYYMMDD-XXXXXX`).
+  - Captures primary diagnosis, vitals (BP, pulse, temp, weight), structured medications (dosage, frequency, duration, instructions), diagnostic tests, and clinical advice.
+- **Patient Privacy**:
+  - Patients can only view their own prescriptions (`GET /api/v1/prescriptions/patient/me`).
+  - Third-party patients are blocked with HTTP `403 Forbidden`.
+- **Print Optimization**:
+  - Dedicated `@media print` CSS layout rendering official clinic Rx slips suitable for pharmacy dispensing.
 
-### 3.3 Conflict Handling Flow
-1. Patient A and Patient B concurrently request to book Doctor D on date `2026-11-05` at `10:00`.
-2. The service performs an atomic insert into the `appointments` collection.
-3. Whichever operation reaches MongoDB first succeeds, inserting the appointment document.
-4. The second concurrent operation violates the unique partial index and MongoDB raises `pymongo.errors.DuplicateKeyError`.
-5. The backend catches `DuplicateKeyError` and returns an HTTP `409 Conflict` response with an explanatory message: `"This slot has already been booked by another patient. Please select another slot."`
-6. Cancelled or completed appointments do not match the partial filter expression, freeing the slot for future bookings if cancelled.
+### 3.4 In-App Notifications System
+- Polling-based notification engine (`GET /api/v1/notifications`).
+- Unread counter badge displayed on Navbar bell icon.
+- Event dispatchers for appointment bookings, confirmations, cancellations, rescheduling, payments, and prescription issuance.
+- Duplicate suppression mechanism preventing spam on retries within 5 minutes.
 
----
-
-## 4. Frontend Architecture
-
-### 4.1 Single Page Application (SPA)
-- Developed using **React 18** and **Vite**.
-- Client-side routing managed with **React Router v6**.
-- Navigation and layout structure:
-  - **Public routes**: `/`, `/doctors`, `/doctors/:id`, `/login`, `/register`.
-  - **Protected patient routes**: `/patient/dashboard`, `/patient/appointments`, `/patient/profile`.
-  - **Protected doctor routes**: `/doctor/dashboard`, `/doctor/appointments`, `/doctor/schedule`, `/doctor/profile`.
-  - **Protected admin routes**: `/admin/dashboard`, `/admin/doctors`, `/admin/patients`, `/admin/appointments`.
-
-### 4.2 State Management & Authentication
-- **`AuthContext`**: Manages user authentication state, tokens, user profile, and persistent storage in `localStorage`.
-- **Axios Interceptors**: Automatically injects `Authorization: Bearer <token>` into outgoing API calls and handles 401 token expirations gracefully.
+### 3.5 Appointment Rescheduling Engine
+- Endpoint `POST /api/v1/appointments/<id>/reschedule`.
+- Atomically checks target doctor schedule (working hours, lunch breaks, unavailable dates) and ensures no slot collisions.
+- Re-schedules appointment date and time, increments `reschedule_count`, and notifies both participants.

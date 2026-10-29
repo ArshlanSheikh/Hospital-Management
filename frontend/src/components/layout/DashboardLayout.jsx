@@ -10,7 +10,8 @@ import {
   Users,
   LogOut,
   Stethoscope,
-  ClipboardList
+  ClipboardList,
+  FileText
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import styles from "./DashboardLayout.module.css";
@@ -66,6 +67,17 @@ const DashboardLayout = ({ allowedRoles }) => {
               </li>
               <li>
                 <NavLink
+                  to="/patient/prescriptions"
+                  className={({ isActive }) =>
+                    `${styles.navItem} ${isActive ? styles.navItemActive : ""}`
+                  }
+                >
+                  <FileText size={18} />
+                  <span>My Prescriptions</span>
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
                   to="/doctors"
                   className={({ isActive }) =>
                     `${styles.navItem} ${isActive ? styles.navItemActive : ""}`
@@ -115,6 +127,17 @@ const DashboardLayout = ({ allowedRoles }) => {
                 >
                   <Calendar size={18} />
                   <span>Appointments</span>
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/doctor/prescriptions"
+                  className={({ isActive }) =>
+                    `${styles.navItem} ${isActive ? styles.navItemActive : ""}`
+                  }
+                >
+                  <FileText size={18} />
+                  <span>Issued Prescriptions</span>
                 </NavLink>
               </li>
               <li>

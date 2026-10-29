@@ -23,8 +23,11 @@ class DoctorRepository:
         try:
             uid = ObjectId(user_id)
         except (InvalidId, TypeError):
-            return None
-        doc = db.doctor_profiles.find_one({"user_id": uid})
+            uid = None
+        conds = [{"user_id": str(user_id)}]
+        if uid:
+            conds.append({"user_id": uid})
+        doc = db.doctor_profiles.find_one({"$or": conds})
         return serialize_doc(doc) if doc else None
 
     @staticmethod

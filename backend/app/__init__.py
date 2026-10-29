@@ -41,12 +41,20 @@ def create_app(config_name=None):
     from app.patients.routes import patients_bp
     from app.appointments.routes import appointments_bp
     from app.admin.routes import admin_bp
+    from app.notifications.routes import notifications_bp
+    from app.payments.routes import payments_bp
+    from app.prescriptions.routes import prescriptions_bp
+    from app.consultations.routes import consultations_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
     app.register_blueprint(doctors_bp, url_prefix="/api/v1/doctors")
     app.register_blueprint(patients_bp, url_prefix="/api/v1/patients")
     app.register_blueprint(appointments_bp, url_prefix="/api/v1/appointments")
     app.register_blueprint(admin_bp, url_prefix="/api/v1/admin")
+    app.register_blueprint(notifications_bp)
+    app.register_blueprint(payments_bp)
+    app.register_blueprint(prescriptions_bp)
+    app.register_blueprint(consultations_bp)
 
     # Health check route
     @app.route("/api/v1/health", methods=["GET"])

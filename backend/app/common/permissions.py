@@ -33,9 +33,15 @@ def get_current_user():
 def role_required(*allowed_roles):
     """
     Decorator to restrict endpoint access to specific roles.
-    Example: @role_required(UserRole.DOCTOR.value, UserRole.ADMIN.value)
+    Example: @role_required(UserRole.DOCTOR.value, UserRole.ADMIN.value) or @role_required("doctor")
     """
-    normalized_allowed = [UserRole.normalize(r) for r in allowed_roles]
+    flattened = []
+    for r in allowed_roles:
+        if isinstance(r, (list, tuple, set)):
+            flattened.extend(r)
+        else:
+            flattened.append(r)
+    normalized_allowed = [UserRole.normalize(r) for r in flattened]
 
     def decorator(fn):
         @wraps(fn)

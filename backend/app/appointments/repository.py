@@ -37,6 +37,11 @@ class AppointmentRepository:
     @staticmethod
     def insert(appointment_data: dict) -> dict:
         db = get_db()
+        if "appointment_number" not in appointment_data:
+            import uuid
+            today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+            appointment_data["appointment_number"] = f"APT-{today_str}-{uuid.uuid4().hex[:6].upper()}"
+
         try:
             result = db.appointments.insert_one(appointment_data)
             appointment_data["_id"] = result.inserted_id
@@ -44,15 +49,23 @@ class AppointmentRepository:
         except DuplicateKeyError:
             raise ConflictError("This time slot has already been booked. Please choose another slot.")
 
-    @staticmethod
-    def get_by_id(appointment_id: str) -> dict:
+    @classmethod
+    def get_by_id(cls, appointment_id: str) -> dict:
         db = get_db()
         try:
             app_id = ObjectId(appointment_id)
         except (InvalidId, TypeError):
             return None
         doc = db.appointments.find_one({"_id": app_id})
-        return AppointmentRepository.enrich_appointment(doc, db) if doc else None
+        return cls.enrich_appointment(doc, db) if doc else None
+
+    @classmethod
+    def find_by_id(cls, appointment_id: str) -> dict:
+        return cls.get_by_id(appointment_id)
+
+    @classmethod
+    def _serialize(cls, doc, db=None) -> dict:
+        return cls.enrich_appointment(doc, db)
 
     @staticmethod
     def find_by_patient(patient_id: str, status: str = None, page: int = 1, limit: int = 10) -> tuple[list, int]:

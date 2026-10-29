@@ -1,4 +1,4 @@
-# Local Development & Environment Setup Guide (Phase V1)
+# Local Development & Environment Setup Guide (Phase V1 & V2)
 
 ## Prerequisites
 - **Python**: 3.10+ (tested on Python 3.13)
@@ -14,7 +14,6 @@ Ensure MongoDB service is running locally:
 # Verify connection
 mongosh --eval "db.adminCommand('ping')"
 ```
-If using a custom connection URI or MongoDB Atlas, configure it in `backend/.env`.
 
 ---
 
@@ -55,23 +54,28 @@ MONGODB_DATABASE_TEST=hospital_consultation_test
 JWT_ACCESS_TOKEN_EXPIRES_MINUTES=120
 FRONTEND_ORIGIN=http://localhost:5173
 PORT=5000
+
+# Razorpay Test Gateway (Phase V2)
+RAZORPAY_KEY_ID=rzp_test_sample
+RAZORPAY_KEY_SECRET=sample_secret_key
+RAZORPAY_CURRENCY=INR
 ```
 
 ### Database Seeding & CLI Commands
 ```bash
-# Seed initial Phase V1 data (1 admin, 1 patient, 4 verified doctors, 1 pending doctor)
+# Seed initial Phase V1 & V2 data
 python -m flask seed-v1
 
-# Create an administrator account
+# Create custom platform administrator
 python -m flask create-admin --email admin@medicare.com --password Admin@123456
 ```
 
-### Run Automated Tests
+### Run Automated Tests (35 Tests)
 ```bash
 pytest -v
 ```
 
-### Start Development Server
+### Start Backend Development Server
 ```bash
 python run.py
 # Server runs on http://127.0.0.1:5000
@@ -95,18 +99,31 @@ npm run dev
 # Accessible at http://localhost:5173
 ```
 
-The Vite development server is configured with a proxy (`/api` -> `http://127.0.0.1:5000/api`) in [vite.config.js](file:///e:/office%20project/Hospital-Management/frontend/vite.config.js).
+The Vite dev server proxies `/api` to `http://127.0.0.1:5000/api`.
 
 ---
 
-## 4. Pre-Seeded Demo Logins
+## 4. Phase V2 Testing Guide
 
-| Role | Email | Password |
-|---|---|---|
-| **Platform Admin** | `admin@medicare.com` | `Admin@123456` |
-| **Patient** | `patient@example.com` | `Patient@123456` |
-| **Doctor (Cardiology)** | `sarah.jenkins@medicare.com` | `Doctor@123456` |
-| **Doctor (Pediatrics)** | `rajesh.sharma@medicare.com` | `Doctor@123456` |
-| **Doctor (Dermatology)** | `emily.chen@medicare.com` | `Doctor@123456` |
-| **Doctor (Neurology)** | `vikram.patel@medicare.com` | `Doctor@123456` |
-| **Doctor (Pending)** | `anita.desai@medicare.com` | `Doctor@123456` |
+### 1. Online Video Consultation
+1. Log in as **Patient** (`patient@example.com` / `Patient@123456`).
+2. Navigate to **My Appointments** and click **Join Video Room** on an active video appointment.
+3. Allow camera/mic permissions in the lobby preview.
+4. Click **Join Secure Consultation**. The WebRTC video room opens.
+5. In another browser tab/window, log in as **Doctor** (`sarah.jenkins@medicare.com` / `Doctor@123456`) and click **Enter Consultation Room** on the same appointment to join the call simultaneously.
+
+### 2. Razorpay Payments
+1. On **My Appointments** as a patient, click **Pay ₹750 (Razorpay)** on an unpaid appointment.
+2. Click **Instant Test Payment (Sandbox Simulation)** or use the test Razorpay checkout popup.
+3. The appointment updates to `CONFIRMED` and `PAID` with an official digital receipt.
+
+### 3. Digital Prescriptions
+1. Inside the video call or on the doctor appointments screen, click **Issue Prescription (Rx)**.
+2. Fill diagnosis, vitals, and add medications.
+3. Click **Issue Digital Prescription**.
+4. Patient immediately receives an in-app notification and can view/print the official Rx slip under **My Prescriptions**.
+
+### 4. Appointment Rescheduling
+1. On patient appointments, click **Reschedule**.
+2. Pick a new date and an available slot.
+3. Click **Save Changes**. The booking updates and notifications are dispatched.

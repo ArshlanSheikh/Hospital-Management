@@ -61,3 +61,40 @@ class ConsultationType(str, Enum):
     @classmethod
     def list(cls):
         return [c.value for c in cls]
+
+
+class PaymentStatus(str, Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    REFUNDED = "refunded"
+
+    @classmethod
+    def list(cls):
+        return [c.value for c in cls]
+
+
+class NotificationType(str, Enum):
+    BOOKING = "booking"
+    CONFIRMATION = "confirmation"
+    CANCELLATION = "cancellation"
+    RESCHEDULE = "reschedule"
+    PAYMENT = "payment"
+    PRESCRIPTION = "prescription"
+    CONSULTATION = "consultation"
+    SYSTEM = "system"
+
+    @classmethod
+    def list(cls):
+        return [c.value for c in cls]
+
+
+class ConsultationStatus(str, Enum):
+    SCHEDULED = "scheduled"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    MISSED = "missed"
+
+    @classmethod
+    def list(cls):
+        return [c.value for c in cls]

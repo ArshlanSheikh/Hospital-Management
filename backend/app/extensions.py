@@ -42,6 +42,24 @@ def init_db_indexes(db):
         db.appointments.create_index("doctor_id")
         db.appointments.create_index("appointment_date")
         db.appointments.create_index("appointment_status")
+
+        # Prescriptions collection (Phase V2)
+        db.prescriptions.create_index("prescription_number", unique=True)
+        db.prescriptions.create_index("appointment_id")
+        db.prescriptions.create_index("patient_id")
+        db.prescriptions.create_index("doctor_id")
+
+        # Payments collection (Phase V2)
+        db.payments.create_index("order_id", unique=True)
+        db.payments.create_index("payment_id")
+        db.payments.create_index("appointment_id")
+        db.payments.create_index("patient_id")
+        db.payments.create_index("status")
+
+        # Notifications collection (Phase V2)
+        db.notifications.create_index([("user_id", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)])
+        db.notifications.create_index([("user_id", pymongo.ASCENDING), ("is_read", pymongo.ASCENDING)])
+
         logger.info("MongoDB indexes verified successfully.")
     except Exception as err:
         logger.warning("Index initialization encountered an error: %s", err)

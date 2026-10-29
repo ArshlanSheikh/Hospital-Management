@@ -2,6 +2,7 @@ import React from "react";
 import { Link, NavLink } from "react-router-dom";
 import { Activity, User, LogOut, LayoutDashboard, Stethoscope } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import NotificationDropdown from "../common/NotificationDropdown";
 import styles from "./Navbar.module.css";
 
 const Navbar = () => {
@@ -64,6 +65,7 @@ const Navbar = () => {
                 <LayoutDashboard size={16} />
                 <span>Dashboard</span>
               </Link>
+              <NotificationDropdown />
               <div className={styles.userBadge}>
                 <User size={15} color="var(--primary)" />
                 <span>{user?.name || user?.email?.split("@")[0]}</span>

@@ -18,11 +18,13 @@ import Register from "./pages/public/Register";
 // Patient Pages
 import PatientDashboard from "./pages/patient/PatientDashboard";
 import PatientAppointments from "./pages/patient/PatientAppointments";
+import PatientPrescriptions from "./pages/patient/PatientPrescriptions";
 import PatientProfile from "./pages/patient/PatientProfile";
 
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
 import DoctorAppointments from "./pages/doctor/DoctorAppointments";
+import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions";
 import DoctorSchedule from "./pages/doctor/DoctorSchedule";
 import DoctorProfile from "./pages/doctor/DoctorProfile";
 
@@ -31,6 +33,9 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminDoctors from "./pages/admin/AdminDoctors";
 import AdminPatients from "./pages/admin/AdminPatients";
 import AdminAppointments from "./pages/admin/AdminAppointments";
+
+// Consultation Pages (Phase V2)
+import VideoConsultationRoom from "./pages/consultation/VideoConsultationRoom";
 
 const PublicLayout = () => (
   <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -57,10 +62,14 @@ function App() {
               <Route path="/register" element={<Register />} />
             </Route>
 
+            {/* Video Consultation Room (Phase V2) */}
+            <Route path="/consultation/:appointmentId" element={<VideoConsultationRoom />} />
+
             {/* Patient Dashboard */}
             <Route path="/patient" element={<DashboardLayout allowedRoles={["patient"]} />}>
               <Route path="dashboard" element={<PatientDashboard />} />
               <Route path="appointments" element={<PatientAppointments />} />
+              <Route path="prescriptions" element={<PatientPrescriptions />} />
               <Route path="profile" element={<PatientProfile />} />
             </Route>
 
@@ -68,6 +77,7 @@ function App() {
             <Route path="/doctor" element={<DashboardLayout allowedRoles={["doctor"]} />}>
               <Route path="dashboard" element={<DoctorDashboard />} />
               <Route path="appointments" element={<DoctorAppointments />} />
+              <Route path="prescriptions" element={<DoctorPrescriptions />} />
               <Route path="schedule" element={<DoctorSchedule />} />
               <Route path="profile" element={<DoctorProfile />} />
             </Route>

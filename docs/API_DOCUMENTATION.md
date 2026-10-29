@@ -1,4 +1,4 @@
-# API Documentation (Phase V1)
+# API Documentation (Phase V1 & V2)
 
 Base URL: `/api/v1`
 
@@ -29,224 +29,206 @@ All responses follow a consistent JSON envelope format:
 
 ## 1. Authentication Endpoints (`/api/v1/auth`)
 
-### `POST /auth/register/patient`
-Register a new patient account and medical profile.
-- **Access**: Public
-- **Request Body**:
-  ```json
-  {
-    "email": "user@example.com",
-    "password": "Password@123",
-    "full_name": "John Doe",
-    "phone": "+91 98765 43210",
-    "date_of_birth": "1992-05-14",
-    "gender": "male",
-    "blood_group": "A+",
-    "address": "12 Main St, Mumbai"
-  }
-  ```
-- **Response**: `201 Created` with access token and profile.
-
-### `POST /auth/register/doctor`
-Register a doctor account and credential profile (requires admin verification).
-- **Access**: Public
-- **Request Body**:
-  ```json
-  {
-    "email": "doctor@example.com",
-    "password": "Doctor@123",
-    "full_name": "Dr. Sarah Jenkins",
-    "phone": "+91 98765 43211",
-    "specialization": "Cardiology",
-    "qualification": "MD, DM (Cardiology)",
-    "experience_years": 12,
-    "license_number": "MCI-2014-9988",
-    "consultation_fee": 800.0,
-    "bio": "Consultant Cardiologist"
-  }
-  ```
-- **Response**: `201 Created` with `verification_status: "pending"`.
-
-### `POST /auth/login`
-Authenticate with email and password.
-- **Access**: Public
-- **Request Body**:
-  ```json
-  {
-    "email": "patient@example.com",
-    "password": "Patient@123456"
-  }
-  ```
-- **Response**: `200 OK` with `access_token` and user object.
-
-### `GET /auth/me`
-Retrieve the currently authenticated user's profile and role.
-- **Access**: Authenticated (`Bearer <token>`)
-- **Response**: `200 OK` with user and profile data.
-
-### `POST /auth/logout`
-Invalidate the current session.
-- **Access**: Authenticated
+| Endpoint | Method | Role | Description |
+|---|---|---|---|
+| `/auth/register/patient` | `POST` | Public | Register patient account and medical profile |
+| `/auth/register/doctor` | `POST` | Public | Register doctor credentials (pending admin verification) |
+| `/auth/login` | `POST` | Public | Authenticate with email/password, return JWT token |
+| `/auth/me` | `GET` | Authenticated | Retrieve current user profile and role |
+| `/auth/logout` | `POST` | Authenticated | Invalidate local session |
 
 ---
 
 ## 2. Doctor Endpoints (`/api/v1/doctors`)
 
-### `GET /doctors`
-Search and filter verified doctors.
-- **Access**: Public
-- **Query Parameters**:
-  - `search`: Name or bio substring
-  - `specialization`: Clinical discipline (e.g., `Cardiology`)
-  - `min_fee`: Minimum fee in INR
-  - `max_fee`: Maximum fee in INR
-  - `min_experience`: Minimum years of experience
-  - `page`: Page index (default: `1`)
-  - `limit`: Items per page (default: `12`)
-- **Response**: `200 OK` with paginated doctor list.
+| Endpoint | Method | Role | Description |
+|---|---|---|---|
+| `/doctors` | `GET` | Public | Search verified doctors (`specialization`, `search`, `min_fee`, `max_fee`) |
+| `/doctors/specializations` | `GET` | Public | List distinct medical categories |
+| `/doctors/<id>` | `GET` | Public | Get detailed verified doctor profile and schedule |
+| `/doctors/<id>/availability?date=YYYY-MM-DD` | `GET` | Public | Compute live available slots excluding lunch breaks & booked slots |
+| `/doctors/profile` | `GET` | Doctor | Get own full profile |
+| `/doctors/profile` | `PUT` | Doctor | Update own qualifications, consultation fee, bio, phone |
+| `/doctors/schedule` | `PUT` | Doctor | Update weekly consulting schedule and lunch break |
 
-### `GET /doctors/specializations`
-List distinct available specializations among verified doctors.
-- **Access**: Public
-- **Response**: `200 OK` with array of string specializations.
+---
 
-### `GET /doctors/<doctor_id>`
-Get detailed public profile of a verified doctor.
-- **Access**: Public
-- **Response**: `200 OK` with full doctor profile and weekly schedule.
+## 3. Appointment Endpoints (`/api/v1/appointments`)
 
-### `GET /doctors/<doctor_id>/availability?date=YYYY-MM-DD`
-Compute live time slots for a given date based on doctor's schedule, breaks, and existing bookings.
-- **Access**: Public
+| Endpoint | Method | Role | Description |
+|---|---|---|---|
+| `/appointments` | `POST` | Patient | Book consultation slot with atomic double-booking lock |
+| `/appointments` | `GET` | Authenticated | List appointments scoped by current user role |
+| `/appointments/<id>` | `GET` | Authenticated | Get detailed appointment information |
+| `/appointments/<id>/cancel` | `POST` | Authorized | Cancel appointment with mandatory reason |
+| `/appointments/<id>/reschedule` | `POST` | Patient/Doctor | **(Phase V2)** Reschedule date and time slot with conflict check |
+| `/appointments/<id>/status` | `PATCH` | Doctor/Admin | Update status (`confirmed`, `completed`, `rejected`) |
+
+---
+
+## 4. Online Payment Endpoints (`/api/v1/payments`) — Phase V2
+
+### `POST /payments/create-order`
+Create a server-side Razorpay order for an appointment.
+- **Access**: Patient (owner of appointment) or Admin
+- **Request**:
+  ```json
+  {
+    "appointment_id": "6720fae99214..."
+  }
+  ```
+- **Response**: `201 Created`
+  ```json
+  {
+    "success": true,
+    "data": {
+      "order_id": "order_Mabc12345678",
+      "amount": 750.0,
+      "amount_paise": 75000,
+      "currency": "INR",
+      "key_id": "rzp_test_sample",
+      "appointment_number": "APT-20261029-A4B92E"
+    }
+  }
+  ```
+
+### `POST /payments/verify`
+Verify Razorpay HMAC SHA256 signature and update appointment confirmation.
+- **Access**: Authenticated
+- **Request**:
+  ```json
+  {
+    "razorpay_order_id": "order_Mabc12345678",
+    "razorpay_payment_id": "pay_Mdef98765432",
+    "razorpay_signature": "cryptographic_hmac_sha256_hash"
+  }
+  ```
+- **Response**: `200 OK` with updated payment record and confirmed appointment.
+
+### `GET /payments/history`
+Retrieve payment transaction ledger for the current user.
+- **Access**: Authenticated
+
+### `GET /payments/receipt/<receipt_id>`
+Get print/download receipt data.
+- **Access**: Authenticated
+
+---
+
+## 5. Digital Prescriptions (`/api/v1/prescriptions`) — Phase V2
+
+### `POST /prescriptions`
+Issue a new digital prescription for an eligible consultation.
+- **Access**: Doctor (assigned to the appointment)
+- **Request**:
+  ```json
+  {
+    "appointment_id": "6720fae99214...",
+    "diagnosis": "Essential Hypertension",
+    "vital_signs": {
+      "blood_pressure": "130/80",
+      "pulse": "72 bpm"
+    },
+    "medicines": [
+      {
+        "name": "Telmisartan",
+        "dosage": "40 mg",
+        "frequency": "Once daily (Morning)",
+        "duration": "30 days",
+        "instructions": "After breakfast"
+      }
+    ],
+    "tests_recommended": ["Lipid Profile"],
+    "advice_notes": "Reduce salt, walk 30 mins daily",
+    "follow_up_date": "2026-11-30",
+    "mark_appointment_completed": true
+  }
+  ```
+- **Response**: `201 Created` with generated `prescription_number` (`RX-YYYYMMDD-XXXXXX`).
+
+### `GET /prescriptions/patient/me`
+Retrieve all prescriptions issued to the authenticated patient.
+- **Access**: Patient
+
+### `GET /prescriptions/doctor/me`
+Retrieve all prescriptions issued by the authenticated doctor.
+- **Access**: Doctor
+
+### `GET /prescriptions/appointment/<appointment_id>`
+Get the prescription associated with a consultation appointment.
+- **Access**: Assigned Doctor or Patient
+
+### `GET /prescriptions/<rx_id>`
+Get detailed prescription record by ID.
+- **Access**: Assigned Doctor or Patient
+
+---
+
+## 6. Online Video Consultation (`/api/v1/consultations`) — Phase V2
+
+### `GET /consultations/<appointment_id>/session`
+Authorize caller and retrieve secure WebRTC / Jitsi room credentials.
+- **Access**: Assigned Doctor or Booking Patient
 - **Response**:
   ```json
   {
     "success": true,
     "data": {
-      "doctor_id": "...",
-      "date": "2026-11-05",
-      "is_available_day": true,
-      "slots": [
-        {"start_time": "09:00", "end_time": "09:30", "is_available": true},
-        {"start_time": "09:30", "end_time": "10:00", "is_available": false}
-      ]
+      "appointment_id": "6720fae99214...",
+      "appointment_number": "APT-20261029-A4B92E",
+      "room_name": "medipulse_apt20261029a4b92e_a1b2c3d4e5f6",
+      "provider": "jitsi",
+      "domain": "meet.jit.si",
+      "user_role": "patient",
+      "display_name": "Jane Doe",
+      "consultation_status": "in_progress"
     }
   }
   ```
 
-### `GET /doctors/profile`
-Retrieve the authenticated doctor's full profile.
-- **Access**: Doctor (`role: "doctor"`)
+### `POST /consultations/<appointment_id>/complete`
+Officially conclude video session.
+- **Access**: Doctor or Admin
 
-### `PUT /doctors/profile`
-Update own profile information (qualifications, fee, bio, phone).
-- **Access**: Doctor
-
-### `PUT /doctors/schedule`
-Update weekly consultation schedule (working hours, lunch break, slot duration).
-- **Access**: Doctor
+### `POST /consultations/<appointment_id>/missed`
+Mark consultation as missed if participant did not attend.
+- **Access**: Doctor or Admin
 
 ---
 
-## 3. Patient Endpoints (`/api/v1/patients`)
+## 7. In-App Notifications (`/api/v1/notifications`) — Phase V2
 
-### `GET /patients/profile`
-Retrieve authenticated patient's profile and emergency contacts.
-- **Access**: Patient (`role: "patient"`)
-
-### `PUT /patients/profile`
-Update own profile information (address, emergency contact, phone).
-- **Access**: Patient
-
----
-
-## 4. Appointment Endpoints (`/api/v1/appointments`)
-
-### `POST /appointments`
-Book an appointment slot with atomic conflict check.
-- **Access**: Patient (`role: "patient"`)
-- **Request Body**:
+### `GET /notifications`
+Retrieve user notifications and unread counter.
+- **Access**: Authenticated
+- **Response**:
   ```json
   {
-    "doctor_id": "6720fae99214...",
-    "appointment_date": "2026-11-05",
-    "start_time": "10:00",
-    "consultation_type": "in_person",
-    "reason": "Routine cardiac checkup"
+    "success": true,
+    "data": {
+      "notifications": [ ... ],
+      "unread_count": 2
+    }
   }
   ```
-- **Response**: `201 Created` with appointment document and `appointment_number`.
-- **Conflict**: `409 Conflict` if the slot is already reserved.
 
-### `GET /appointments`
-List appointments scoped by user role:
-- **Patient**: Returns patient's own bookings.
-- **Doctor**: Returns appointments booked with this doctor.
-- **Admin**: Returns all appointments across platform.
+### `PATCH /notifications/<id>/read`
+Mark single notification as read.
+- **Access**: Authenticated (Owner)
+
+### `PATCH /notifications/mark-all-read`
+Mark all unread notifications as read.
 - **Access**: Authenticated
 
-### `GET /appointments/<appointment_id>`
-Get detailed appointment information.
-- **Access**: Authenticated (Owner patient, assigned doctor, or admin)
-
-### `POST /appointments/<appointment_id>/cancel`
-Cancel an appointment.
-- **Access**: Authorized (Owner patient, assigned doctor, or admin)
-- **Request Body**:
-  ```json
-  {
-    "reason": "Family emergency"
-  }
-  ```
-- **Response**: `200 OK` with updated appointment (`appointment_status: "cancelled"`).
-
-### `PATCH /appointments/<appointment_id>/status`
-Update status to `confirmed` or `completed`.
-- **Access**: Doctor or Admin
-- **Request Body**:
-  ```json
-  {
-    "status": "completed"
-  }
-  ```
-
 ---
 
-## 5. Administration Endpoints (`/api/v1/admin`)
+## 8. Administration (`/api/v1/admin`)
 
-### `GET /admin/stats`
-Summary platform statistics (total doctors, pending verifications, total patients, appointments, gross volume).
-- **Access**: Admin (`role: "admin"`)
-
-### `GET /admin/doctors`
-List doctors with optional filter `?status=pending|verified|rejected`.
-- **Access**: Admin
-
-### `POST /admin/doctors/<doctor_id>/verify`
-Approve or reject a doctor's credentials.
-- **Access**: Admin
-- **Request Body**:
-  ```json
-  {
-    "status": "verified",
-    "reason": "License verified with Medical Council"
-  }
-  ```
-
-### `GET /admin/patients`
-List all registered patients on the platform.
-- **Access**: Admin
-
-### `POST /admin/patients/<user_id>/status`
-Toggle patient account status (`active` / `suspended`).
-- **Access**: Admin
-- **Request Body**:
-  ```json
-  {
-    "status": "suspended"
-  }
-  ```
-
-### `GET /admin/appointments`
-Audit registry of all platform appointments with optional query filters (`status`, `date`).
-- **Access**: Admin
+| Endpoint | Method | Role | Description |
+|---|---|---|---|
+| `/admin/stats` | `GET` | Admin | Total platform counts (doctors, patients, appointments, revenue) |
+| `/admin/doctors` | `GET` | Admin | List doctors with `?status=pending\|verified\|rejected` |
+| `/admin/doctors/<id>/verify` | `POST` | Admin | Verify or reject doctor credentials |
+| `/admin/patients` | `GET` | Admin | List all registered patients |
+| `/admin/patients/<id>/status` | `POST` | Admin | Toggle patient account status (`active` / `suspended`) |
+| `/admin/appointments` | `GET` | Admin | Platform-wide consultation audit registry |

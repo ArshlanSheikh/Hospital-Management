@@ -18,6 +18,11 @@ class Config:
     MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "hospital_consultation")
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 
+    # Razorpay Payment Gateway
+    RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_test_medipulse_sample")
+    RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "sample_secret_medipulse_2026")
+    RAZORPAY_CURRENCY = os.getenv("RAZORPAY_CURRENCY", "INR")
+
 
 class DevelopmentConfig(Config):
     """Development configuration using local or Atlas MongoDB."""

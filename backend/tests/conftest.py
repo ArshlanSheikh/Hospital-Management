@@ -17,12 +17,18 @@ def app():
         db.doctor_profiles.delete_many({})
         db.patient_profiles.delete_many({})
         db.appointments.delete_many({})
+        db.notifications.delete_many({})
+        db.payments.delete_many({})
+        db.prescriptions.delete_many({})
         yield app
         # Clean up after test run
         db.users.delete_many({})
         db.doctor_profiles.delete_many({})
         db.patient_profiles.delete_many({})
         db.appointments.delete_many({})
+        db.notifications.delete_many({})
+        db.payments.delete_many({})
+        db.prescriptions.delete_many({})
 
 
 @pytest.fixture
