@@ -230,19 +230,29 @@ const DashboardLayout = ({ allowedRoles }) => {
       <aside className={styles.sidebar}>
         <Link to="/" className={styles.sidebarBrand}>
           <div className={styles.brandIcon}>
-            <Activity size={18} />
+            <Activity size={20} />
           </div>
-          <span>MediPulse</span>
+          <div className={styles.brandInfo}>
+            <div className={styles.brandTitle}>MediPulse Health</div>
+            <div className={styles.brandType}>
+              {role === "doctor" ? "Clinical Workspace" : role === "patient" ? "Patient Portal" : "Admin System"}
+            </div>
+          </div>
         </Link>
 
         <div className={styles.navSection}>{renderNavLinks()}</div>
 
         <div className={styles.userFooter}>
           <div className={styles.userMeta}>
-            <span className={styles.userEmail}>{user.name || user.email}</span>
-            <span className="badge badge-primary">{user.role?.toUpperCase()}</span>
+            <div className={styles.userAvatar}>
+              {user?.name ? user.name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() || "U"}
+            </div>
+            <div className={styles.userText}>
+              <span className={styles.userEmail}>{user.name || user.email}</span>
+              <span className={styles.userRoleTag}>{user.role || role}</span>
+            </div>
           </div>
-          <button onClick={logout} className="btn btn-outline" style={{ padding: "0.4rem" }} title="Log Out">
+          <button onClick={logout} className={styles.logoutBtn} title="Sign Out">
             <LogOut size={16} />
           </button>
         </div>
@@ -250,15 +260,15 @@ const DashboardLayout = ({ allowedRoles }) => {
 
       <div className={styles.mainWrapper}>
         <header className={styles.topBar}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--primary)" }}>
-              MediPulse Platform
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className={styles.topBarTitle}>
+              {role === "doctor" ? "Clinical Workspace" : role === "patient" ? "Patient Portal" : "Administrator Portal"}
             </span>
-            <span className="badge badge-info">{role?.toUpperCase()}</span>
+            <span className="badge badge-primary">{role?.toUpperCase()}</span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <Link to="/" className="btn btn-outline" style={{ fontSize: "0.85rem", padding: "0.45rem 0.85rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <Link to="/" className="btn btn-secondary btn-sm">
               Public Portal
             </Link>
           </div>

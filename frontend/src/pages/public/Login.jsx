@@ -1,27 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogIn, Key, Mail, ShieldCheck, UserCheck } from "lucide-react";
+import { LogIn, Lock, Mail, Eye, EyeOff, ShieldCheck, Activity, AlertCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
-
-const DEMO_ACCOUNTS = [
-  { role: "patient", label: "Patient Demo", email: "patient@example.com", pass: "Patient@123456" },
-  { role: "doctor", label: "Doctor Demo (Dr. Sarah)", email: "sarah.jenkins@medicare.com", pass: "Doctor@123456" },
-  { role: "admin", label: "Admin Demo", email: "admin@medicare.com", pass: "Admin@123456" },
-];
+import styles from "./Auth.module.css";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { login } = useAuth();
-  const { showSuccess, showError } = useToast();
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const { login, isAuthenticated, role, loading } = useAuth();
+  const { showSuccess } = useToast();
   const navigate = useNavigate();
+
+  // If already authenticated, redirect to role dashboard immediately
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      const userRole = role?.toLowerCase();
+      if (userRole === "patient") {
+        navigate("/patient/dashboard", { replace: true });
+      } else if (userRole === "doctor") {
+        navigate("/doctor/dashboard", { replace: true });
+      } else if (userRole === "admin" || userRole === "platform_admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
+    }
+  }, [isAuthenticated, role, loading, navigate]);
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage("");
+
     if (!email || !password) {
-      showError("Please enter your email and password");
+      setErrorMessage("Please enter both email address and password.");
       return;
     }
 
@@ -31,120 +47,128 @@ const Login = () => {
       showSuccess(`Welcome back, ${loggedInUser.name || loggedInUser.email}!`);
 
       const userRole = loggedInUser.role?.toLowerCase();
-      switch (userRole) {
-        case "patient":
-          navigate("/patient/dashboard");
-          break;
-        case "doctor":
-          navigate("/doctor/dashboard");
-          break;
-        case "admin":
-        case "platform_admin":
-          navigate("/admin/dashboard");
-          break;
-        default:
-          navigate("/");
+      if (userRole === "patient") {
+        navigate("/patient/dashboard", { replace: true });
+      } else if (userRole === "doctor") {
+        navigate("/doctor/dashboard", { replace: true });
+      } else if (userRole === "admin" || userRole === "platform_admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/", { replace: true });
       }
     } catch (err) {
-      showError(err.message || "Invalid email or password");
+      setErrorMessage(err.message || "Invalid email or password. Please verify your credentials.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleFillDemo = (acc) => {
-    setEmail(acc.email);
-    setPassword(acc.pass);
-  };
+  if (loading || isAuthenticated) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}>
+        <div className="spinner" style={{ color: "var(--primary)", width: "2.5rem", height: "2.5rem" }} />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: "4rem 1.5rem", minHeight: "calc(100vh - 4.5rem)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div className="card" style={{ maxWidth: "460px", width: "100%", padding: "2.5rem" }}>
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--primary)", marginBottom: "0.5rem" }}>
-            Account Sign In
-          </h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-            Access your patient portal, doctor workspace, or administration dashboard.
-          </p>
+    <div className={styles.pageWrapper}>
+      <div className={styles.authCard}>
+        {/* Header Section */}
+        <div className={styles.headerSection}>
+          <div className={styles.logoIcon}>
+            <Activity size={26} />
+          </div>
+          <h1 className={styles.title}>MediPulse Portal</h1>
+          <p className={styles.subtitle}>Unified clinical, patient, and administrative authentication</p>
         </div>
 
-        {/* Quick Fill Demo Credentials */}
-        <div style={{
-          backgroundColor: "var(--bg-page)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius-sm)",
-          padding: "0.85rem",
-          marginBottom: "1.5rem"
-        }}>
-          <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: "0.5rem", textTransform: "uppercase" }}>
-            Quick Demo Autofill:
-          </span>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.4rem" }}>
-            {DEMO_ACCOUNTS.map((acc) => (
-              <button
-                key={acc.role}
-                type="button"
-                onClick={() => handleFillDemo(acc)}
-                className="btn btn-outline"
-                style={{ padding: "0.4rem 0.6rem", fontSize: "0.82rem", justifyContent: "flex-start", gap: "0.4rem" }}
-              >
-                <UserCheck size={14} color="var(--primary)" />
-                <span>{acc.label}</span>
-                <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--text-muted)" }}>{acc.email}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <form onSubmit={handleLoginSubmit}>
-          <div className="form-group" style={{ marginBottom: "1.25rem" }}>
-            <label className="form-label">Email Address</label>
-            <div style={{ position: "relative" }}>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className="form-control"
-                style={{ paddingLeft: "2.3rem" }}
-              />
-              <Mail size={16} color="var(--text-muted)" style={{ position: "absolute", left: "0.8rem", top: "50%", transform: "translateY(-50%)" }} />
+        {/* Body Section */}
+        <div className={styles.bodySection}>
+          {errorMessage && (
+            <div className={styles.errorMessage}>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span>{errorMessage}</span>
             </div>
-          </div>
+          )}
 
-          <div className="form-group" style={{ marginBottom: "1.25rem" }}>
-            <label className="form-label">Password</label>
-            <div style={{ position: "relative" }}>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="form-control"
-                style={{ paddingLeft: "2.3rem" }}
-              />
-              <Key size={16} color="var(--text-muted)" style={{ position: "absolute", left: "0.8rem", top: "50%", transform: "translateY(-50%)" }} />
+          <form onSubmit={handleLoginSubmit}>
+            <div className="form-group">
+              <label className="form-label">
+                Email Address <span className="required">*</span>
+              </label>
+              <div className={styles.inputWrapper}>
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setErrorMessage("");
+                  }}
+                  placeholder="name@example.com"
+                  className={`form-input ${styles.inputWithIcon}`}
+                />
+                <Mail size={16} className={styles.inputIcon} />
+              </div>
             </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                Password <span className="required">*</span>
+              </label>
+              <div className={styles.inputWrapper}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setErrorMessage("");
+                  }}
+                  placeholder="••••••••••••"
+                  className={`form-input ${styles.inputWithIcon}`}
+                  style={{ paddingRight: "38px" }}
+                />
+                <Lock size={16} className={styles.inputIcon} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className={styles.togglePassBtn}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className={`btn btn-primary ${styles.submitBtn}`}
+            >
+              {submitting ? (
+                <div className="spinner" style={{ width: "1.2rem", height: "1.2rem", color: "white" }} />
+              ) : (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                  <LogIn size={17} />
+                  <span>Sign In</span>
+                </span>
+              )}
+            </button>
+          </form>
+
+          <div className={styles.securityNote}>
+            <ShieldCheck size={14} color="var(--success)" />
+            <span>256-bit encrypted HIPAA-compliant clinical gateway</span>
           </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="btn btn-primary"
-            style={{ width: "100%", padding: "0.85rem", marginTop: "1rem", fontSize: "1rem" }}
-          >
-            {submitting ? <div className="spinner" /> : "Sign In to Platform"}
-          </button>
-        </form>
-
-        <div style={{ textAlign: "center", marginTop: "1.75rem", fontSize: "0.88rem", color: "var(--text-secondary)" }}>
-          Don't have an account yet?{" "}
-          <Link to="/register" style={{ color: "var(--primary)", fontWeight: 700 }}>
-            Create Account
-          </Link>
+          <div className={styles.footerPrompt}>
+            Don&apos;t have an account?
+            <Link to="/register">Create an account</Link>
+          </div>
         </div>
       </div>
     </div>

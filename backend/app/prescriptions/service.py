@@ -45,8 +45,16 @@ class PrescriptionService:
 
         # Fetch patient profile
         db = mongo.get_database()
-        patient_profile = db.patient_profiles.find_one({"$or": [{"user_id": ObjectId(appointment["patient_id"]) if ObjectId.is_valid(appointment["patient_id"]) else appointment["patient_id"]}, {"user_id": str(appointment["patient_id"])}]})
-        patient_name = patient_profile.get("full_name") if patient_profile else "Patient"
+        patient_uid = ObjectId(appointment["patient_id"]) if ObjectId.is_valid(appointment["patient_id"]) else appointment["patient_id"]
+        patient_profile = db.patient_profiles.find_one({"$or": [{"user_id": patient_uid}, {"user_id": str(patient_uid)}]})
+        patient_user = db.users.find_one({"_id": patient_uid}) if ObjectId.is_valid(patient_uid) else None
+
+        patient_name = (
+            (patient_profile.get("full_name") if patient_profile else None)
+            or (patient_user.get("name") if patient_user else None)
+            or appointment.get("patient_name")
+            or "Patient"
+        )
         patient_gender = patient_profile.get("gender", "") if patient_profile else ""
         patient_dob = patient_profile.get("date_of_birth", "") if patient_profile else ""
 

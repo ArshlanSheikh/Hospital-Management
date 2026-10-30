@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from bson import ObjectId
+from pymongo import ReturnDocument
 from app.extensions import mongo
 
 
@@ -82,7 +83,7 @@ class PrescriptionRepository:
         res = cls._collection().find_one_and_update(
             {"_id": ObjectId(rx_id)},
             {"$set": fields},
-            return_document=True
+            return_document=ReturnDocument.AFTER
         )
         return cls._serialize(res)
 

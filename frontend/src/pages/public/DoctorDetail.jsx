@@ -59,8 +59,9 @@ const DoctorDetail = () => {
       setSelectedSlot(null);
       try {
         const dateStr = format(selectedDate, "yyyy-MM-dd");
-        const res = await apiClient.get(`/doctors/${doctorId}/availability?date=${dateStr}`);
-        setSlots(res.data || []);
+        const res = await apiClient.get(`/doctors/${doctorId}/availability?date=${dateStr}&available_only=true`);
+        const slotsArray = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+        setSlots(slotsArray.filter((s) => s.is_available !== false));
       } catch (err) {
         console.error("Failed to fetch slots", err);
         setSlots([]);
@@ -108,8 +109,9 @@ const DoctorDetail = () => {
       showError(err.message || "Failed to book appointment");
       // Refresh slots in case slot was just taken
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const slotsRes = await apiClient.get(`/doctors/${doctorId}/availability?date=${dateStr}`);
-      setSlots(slotsRes.data || []);
+      const slotsRes = await apiClient.get(`/doctors/${doctorId}/availability?date=${dateStr}&available_only=true`);
+      const freshSlots = Array.isArray(slotsRes.data) ? slotsRes.data : (Array.isArray(slotsRes) ? slotsRes : []);
+      setSlots(freshSlots.filter((s) => s.is_available !== false));
       setSelectedSlot(null);
     } finally {
       setSubmitting(false);

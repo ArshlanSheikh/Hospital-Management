@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Calendar, Clock, CheckCircle, XCircle, User, Video, FileText, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Calendar, Clock, CheckCircle, XCircle, User, Video, FileText, Plus, PhoneCall } from "lucide-react";
 import apiClient from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import IssuePrescriptionModal from "../../components/prescriptions/IssuePrescriptionModal";
@@ -14,24 +14,39 @@ const DoctorAppointments = () => {
   // Phase V2 State
   const [prescribingAppt, setPrescribingAppt] = useState(null);
   const [viewingRx, setViewingRx] = useState(null);
+  const [editingRx, setEditingRx] = useState(null);
 
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
 
-  const fetchAppointments = async () => {
-    setLoading(true);
+  const handleStartCall = async (appt) => {
+    try {
+      await apiClient.post(`/consultations/${appt.id}/initiate-call`);
+      navigate(`/consultation/${appt.id}`);
+    } catch (err) {
+      showError(err.message || "Failed to initiate call");
+    }
+  };
+
+  const fetchAppointments = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const url = filterStatus === "all" ? "/appointments?limit=50" : `/appointments?status=${filterStatus}&limit=50`;
       const res = await apiClient.get(url);
       setAppointments(res.data?.data?.appointments || res.data?.appointments || []);
     } catch (err) {
-      showError(err.message || "Failed to fetch appointments");
+      if (showSpinner) showError(err.message || "Failed to fetch appointments");
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAppointments();
+    fetchAppointments(true);
+    const interval = setInterval(() => {
+      fetchAppointments(false);
+    }, 4000);
+    return () => clearInterval(interval);
   }, [filterStatus]);
 
   const handleUpdateStatus = async (apptId, newStatus) => {
@@ -47,13 +62,14 @@ const DoctorAppointments = () => {
   const handleViewPrescription = async (appt) => {
     try {
       const res = await apiClient.get(`/prescriptions/appointment/${appt.id}`);
-      if (res.data?.data?.prescription) {
-        setViewingRx(res.data.data.prescription);
+      const rx = res.data?.prescription || res.prescription || res.data;
+      if (rx && rx.id) {
+        setViewingRx(rx);
       } else {
         showError("No prescription found for this appointment.");
       }
     } catch (err) {
-      showError(err.response?.data?.error?.message || "Failed to load prescription");
+      showError(err.message || "Failed to load prescription");
     }
   };
 
@@ -193,24 +209,34 @@ const DoctorAppointments = () => {
                   flexWrap: "wrap"
                 }}>
                   <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                    {/* Video Consultation Link */}
-                    {isOnline && status === "confirmed" && (
-                      <Link
-                        to={`/consultation/${appt.id}`}
+                    {/* Video Consultation Start / Rejoin Button */}
+                    {isOnline && status !== "cancelled" && status !== "rejected" && (
+                      <button
+                        type="button"
+                        onClick={() => handleStartCall(appt)}
                         className="btn"
                         style={{
-                          background: "#088395",
+                          background: appt.consultation_status === "in_progress" ? "#088395" : "#10b981",
                           color: "white",
                           fontSize: "0.85rem",
                           padding: "0.45rem 1rem",
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: "0.4rem"
+                          gap: "0.4rem",
+                          border: "none",
+                          cursor: "pointer",
+                          fontWeight: 600
                         }}
                       >
-                        <Video size={16} />
-                        <span>Enter Consultation Room</span>
-                      </Link>
+                        <PhoneCall size={15} />
+                        <span>
+                          {appt.consultation_status === "in_progress"
+                            ? "Rejoin Consultation Room"
+                            : status === "completed"
+                            ? "Call Again (Restart Video)"
+                            : "Call Patient (Start Video)"}
+                        </span>
+                      </button>
                     )}
 
                     {/* Issue Prescription */}
@@ -294,6 +320,22 @@ const DoctorAppointments = () => {
         <PrescriptionCard
           prescription={viewingRx}
           onClose={() => setViewingRx(null)}
+          onEdit={(rx) => {
+            setViewingRx(null);
+            setEditingRx(rx);
+          }}
+        />
+      )}
+
+      {/* Edit Prescription Modal */}
+      {editingRx && (
+        <IssuePrescriptionModal
+          existingPrescription={editingRx}
+          onClose={() => setEditingRx(null)}
+          onPrescriptionIssued={(rx) => {
+            showSuccess(`Prescription ${rx.prescription_number || ""} updated successfully!`);
+            fetchAppointments(false);
+          }}
         />
       )}
     </div>

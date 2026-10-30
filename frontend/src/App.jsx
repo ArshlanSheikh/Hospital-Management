@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
 
 // Layouts
@@ -36,6 +36,32 @@ import AdminAppointments from "./pages/admin/AdminAppointments";
 
 // Consultation Pages (Phase V2)
 import VideoConsultationRoom from "./pages/consultation/VideoConsultationRoom";
+import IncomingCallModal from "./components/common/IncomingCallModal";
+
+const GuestRoute = ({ children }) => {
+  const { isAuthenticated, loading, role } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+        <div className="spinner" style={{ color: "var(--primary)", width: "2.5rem", height: "2.5rem" }} />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    const userRole = role?.toLowerCase();
+    if (userRole === "doctor") {
+      return <Navigate to="/doctor/dashboard" replace />;
+    }
+    if (userRole === "admin" || userRole === "platform_admin") {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    return <Navigate to="/patient/dashboard" replace />;
+  }
+
+  return children;
+};
 
 const PublicLayout = () => (
   <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -52,14 +78,29 @@ function App() {
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
+          <IncomingCallModal />
           <Routes>
             {/* Public Routes */}
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/doctors" element={<DoctorDirectory />} />
               <Route path="/doctors/:doctorId" element={<DoctorDetail />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+              <Route
+                path="/login"
+                element={
+                  <GuestRoute>
+                    <Login />
+                  </GuestRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <GuestRoute>
+                    <Register />
+                  </GuestRoute>
+                }
+              />
             </Route>
 
             {/* Video Consultation Room (Phase V2) */}

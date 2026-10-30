@@ -1,8 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, Stethoscope, CheckCircle2 } from "lucide-react";
+import {
+  User,
+  Stethoscope,
+  Lock,
+  Mail,
+  Phone,
+  Eye,
+  EyeOff,
+  Activity,
+  ShieldCheck,
+  AlertCircle,
+  UserCheck
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
+import styles from "./Auth.module.css";
 
 const POPULAR_SPECIALIZATIONS = [
   "General Physician",
@@ -15,14 +28,37 @@ const POPULAR_SPECIALIZATIONS = [
   "Gynecology",
   "ENT Specialist",
   "Ophthalmology",
+  "Gastroenterology",
+  "Pulmonology",
+  "Oncology",
+  "Urology"
 ];
 
 const Register = () => {
   const [roleTab, setRoleTab] = useState("patient");
   const [submitting, setSubmitting] = useState(false);
-  const { registerPatient, registerDoctor } = useAuth();
-  const { showSuccess, showError } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const { registerPatient, registerDoctor, isAuthenticated, role, loading } = useAuth();
+  const { showSuccess } = useToast();
   const navigate = useNavigate();
+
+  // If already authenticated, redirect to role dashboard immediately
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      const userRole = role?.toLowerCase();
+      if (userRole === "patient") {
+        navigate("/patient/dashboard", { replace: true });
+      } else if (userRole === "doctor") {
+        navigate("/doctor/dashboard", { replace: true });
+      } else if (userRole === "admin" || userRole === "platform_admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
+    }
+  }, [isAuthenticated, role, loading, navigate]);
 
   // Common fields
   const [email, setEmail] = useState("");
@@ -32,283 +68,374 @@ const Register = () => {
   const [patientName, setPatientName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
   const [gender, setGender] = useState("Male");
+  const [dob, setDob] = useState("");
 
   // Doctor fields
   const [doctorName, setDoctorName] = useState("");
   const [specialization, setSpecialization] = useState(POPULAR_SPECIALIZATIONS[0]);
-  const [qualifications, setQualifications] = useState("");
+  const [qualifications, setQualifications] = useState("MBBS, MD");
   const [experienceYears, setExperienceYears] = useState(5);
   const [consultationFee, setConsultationFee] = useState(500);
   const [doctorPhone, setDoctorPhone] = useState("");
+  const [bio, setBio] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage("");
+
+    if (!email || !password) {
+      setErrorMessage("Please fill in both email and password.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMessage("Password must be at least 6 characters long.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       if (roleTab === "patient") {
-        await registerPatient({
+        if (!patientName.trim()) {
+          setErrorMessage("Please enter your full legal name.");
+          setSubmitting(false);
+          return;
+        }
+
+        const newUser = await registerPatient({
           email,
           password,
           full_name: patientName,
           phone: patientPhone,
           gender,
+          date_of_birth: dob || null
         });
-        showSuccess("Patient account created successfully!");
-        navigate("/patient/dashboard");
+        showSuccess(`Welcome to MediPulse, ${newUser.name || patientName}!`);
+        navigate("/patient/dashboard", { replace: true });
       } else if (roleTab === "doctor") {
+        if (!doctorName.trim()) {
+          setErrorMessage("Please enter your full professional doctor name.");
+          setSubmitting(false);
+          return;
+        }
+
         await registerDoctor({
           email,
           password,
           full_name: doctorName,
           specialization,
           qualifications,
-          experience_years: parseInt(experienceYears, 10),
-          consultation_fee: parseFloat(consultationFee),
+          experience_years: parseInt(experienceYears, 10) || 1,
+          consultation_fee: parseFloat(consultationFee) || 500,
           phone: doctorPhone,
+          bio
         });
-        showSuccess("Doctor registration submitted! Your account is pending administrator verification.");
-        navigate("/doctor/dashboard");
+        showSuccess("Doctor registration submitted! Verification is in progress.");
+        navigate("/doctor/dashboard", { replace: true });
       }
     } catch (err) {
-      showError(err.message || "Registration failed");
+      setErrorMessage(err.message || "Registration failed. Please check your data.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading || isAuthenticated) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}>
+        <div className="spinner" style={{ color: "var(--primary)", width: "2.5rem", height: "2.5rem" }} />
+      </div>
+    );
+  }
+
   return (
-    <div style={{ padding: "3rem 1.5rem", minHeight: "calc(100vh - 4.5rem)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div className="card" style={{ maxWidth: "560px", width: "100%", padding: "2.5rem" }}>
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--primary)", marginBottom: "0.5rem" }}>
-            Join MediPulse Platform
-          </h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-            Create an account to book doctor consultations or manage your clinical practice.
-          </p>
+    <div className={styles.pageWrapper}>
+      <div className={`${styles.authCard} ${styles.authCardWide}`}>
+        {/* Header Section */}
+        <div className={styles.headerSection}>
+          <div className={styles.logoIcon}>
+            <Activity size={26} />
+          </div>
+          <h1 className={styles.title}>Register Account</h1>
+          <p className={styles.subtitle}>Select your account type to access specialized healthcare tools</p>
+
+          {/* Segmented Tab Switcher */}
+          <div className={styles.tabSwitcher}>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${roleTab === "patient" ? styles.tabBtnActive : ""}`}
+              onClick={() => {
+                setRoleTab("patient");
+                setErrorMessage("");
+              }}
+            >
+              <User size={15} />
+              <span>Patient Account</span>
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${roleTab === "doctor" ? styles.tabBtnActive : ""}`}
+              onClick={() => {
+                setRoleTab("doctor");
+                setErrorMessage("");
+              }}
+            >
+              <Stethoscope size={15} />
+              <span>Doctor Practice</span>
+            </button>
+          </div>
         </div>
 
-        {/* Role Selector Tabs */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "0.5rem",
-          marginBottom: "2rem",
-          backgroundColor: "var(--bg-page)",
-          padding: "0.35rem",
-          borderRadius: "var(--radius-sm)"
-        }}>
-          <button
-            type="button"
-            onClick={() => setRoleTab("patient")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.4rem",
-              padding: "0.7rem",
-              borderRadius: "var(--radius-xs)",
-              fontWeight: 700,
-              fontSize: "0.9rem",
-              border: "none",
-              backgroundColor: roleTab === "patient" ? "#FFFFFF" : "transparent",
-              color: roleTab === "patient" ? "var(--primary)" : "var(--text-secondary)",
-              boxShadow: roleTab === "patient" ? "var(--shadow-sm)" : "none",
-              cursor: "pointer"
-            }}
-          >
-            <User size={16} />
-            <span>I am a Patient</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setRoleTab("doctor")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.4rem",
-              padding: "0.7rem",
-              borderRadius: "var(--radius-xs)",
-              fontWeight: 700,
-              fontSize: "0.9rem",
-              border: "none",
-              backgroundColor: roleTab === "doctor" ? "#FFFFFF" : "transparent",
-              color: roleTab === "doctor" ? "var(--primary)" : "var(--text-secondary)",
-              boxShadow: roleTab === "doctor" ? "var(--shadow-sm)" : "none",
-              cursor: "pointer"
-            }}
-          >
-            <Stethoscope size={16} />
-            <span>I am a Doctor</span>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          {/* Account Credentials */}
-          <div className="form-group" style={{ marginBottom: "1rem" }}>
-            <label className="form-label">Email Address *</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
-              className="form-control"
-            />
-          </div>
-
-          <div className="form-group" style={{ marginBottom: "1rem" }}>
-            <label className="form-label">Password * (min 6 characters)</label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="form-control"
-            />
-          </div>
-
-          {/* Patient Form Fields */}
-          {roleTab === "patient" && (
-            <>
-              <div className="form-group" style={{ marginBottom: "1rem" }}>
-                <label className="form-label">Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={patientName}
-                  onChange={(e) => setPatientName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="form-control"
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                <div className="form-group">
-                  <label className="form-label">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={patientPhone}
-                    onChange={(e) => setPatientPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="form-control"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Gender</label>
-                  <select
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="form-control"
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              </div>
-            </>
+        {/* Body Section */}
+        <div className={styles.bodySection}>
+          {errorMessage && (
+            <div className={styles.errorMessage}>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span>{errorMessage}</span>
+            </div>
           )}
 
-          {/* Doctor Form Fields */}
-          {roleTab === "doctor" && (
-            <>
-              <div className="form-group" style={{ marginBottom: "1rem" }}>
-                <label className="form-label">Doctor Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={doctorName}
-                  onChange={(e) => setDoctorName(e.target.value)}
-                  placeholder="e.g. Dr. Sarah Jenkins"
-                  className="form-control"
-                />
-              </div>
+          <form onSubmit={handleSubmit}>
+            {roleTab === "patient" ? (
+              <div>
+                <div className={styles.formGrid}>
+                  <div className="form-group">
+                    <label className="form-label">
+                      Full Legal Name <span className="required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={patientName}
+                      onChange={(e) => {
+                        setPatientName(e.target.value);
+                        setErrorMessage("");
+                      }}
+                      placeholder="e.g. Rahul Sharma"
+                      className="form-input"
+                    />
+                  </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                <div className="form-group">
-                  <label className="form-label">Specialization *</label>
-                  <select
-                    value={specialization}
-                    onChange={(e) => setSpecialization(e.target.value)}
-                    className="form-control"
+                  <div className="form-group">
+                    <label className="form-label">Phone Number</label>
+                    <div className={styles.inputWrapper}>
+                      <input
+                        type="tel"
+                        value={patientPhone}
+                        onChange={(e) => setPatientPhone(e.target.value)}
+                        placeholder="+91 98765 43210"
+                        className={`form-input ${styles.inputWithIcon}`}
+                      />
+                      <Phone size={15} className={styles.inputIcon} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.formGrid}>
+                  <div className="form-group">
+                    <label className="form-label">Gender</label>
+                    <select
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      className="form-select"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Date of Birth</label>
+                    <input
+                      type="date"
+                      value={dob}
+                      onChange={(e) => setDob(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className={styles.formGrid}>
+                  <div className="form-group">
+                    <label className="form-label">
+                      Doctor Professional Name <span className="required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={doctorName}
+                      onChange={(e) => {
+                        setDoctorName(e.target.value);
+                        setErrorMessage("");
+                      }}
+                      placeholder="e.g. Dr. Sarah Jenkins"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      Specialization <span className="required">*</span>
+                    </label>
+                    <select
+                      value={specialization}
+                      onChange={(e) => setSpecialization(e.target.value)}
+                      className="form-select"
+                    >
+                      {POPULAR_SPECIALIZATIONS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.formGrid}>
+                  <div className="form-group">
+                    <label className="form-label">
+                      Qualifications <span className="required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={qualifications}
+                      onChange={(e) => setQualifications(e.target.value)}
+                      placeholder="e.g. MBBS, MD - Internal Medicine"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Experience (Years)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="60"
+                      value={experienceYears}
+                      onChange={(e) => setExperienceYears(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formGrid}>
+                  <div className="form-group">
+                    <label className="form-label">
+                      Consultation Fee (INR ₹) <span className="required">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="50"
+                      value={consultationFee}
+                      onChange={(e) => setConsultationFee(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Phone Number</label>
+                    <div className={styles.inputWrapper}>
+                      <input
+                        type="tel"
+                        value={doctorPhone}
+                        onChange={(e) => setDoctorPhone(e.target.value)}
+                        placeholder="+91 98765 00000"
+                        className={`form-input ${styles.inputWithIcon}`}
+                      />
+                      <Phone size={15} className={styles.inputIcon} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Email & Password */}
+            <div className={styles.formGrid}>
+              <div className="form-group">
+                <label className="form-label">
+                  Account Email <span className="required">*</span>
+                </label>
+                <div className={styles.inputWrapper}>
+                  <input
+                    type="email"
                     required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setErrorMessage("");
+                    }}
+                    placeholder="doctor@hospital.com"
+                    className={`form-input ${styles.inputWithIcon}`}
+                  />
+                  <Mail size={16} className={styles.inputIcon} />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Password (min 6 chars) <span className="required">*</span>
+                </label>
+                <div className={styles.inputWrapper}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setErrorMessage("");
+                    }}
+                    placeholder="••••••••••••"
+                    className={`form-input ${styles.inputWithIcon}`}
+                    style={{ paddingRight: "38px" }}
+                  />
+                  <Lock size={16} className={styles.inputIcon} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className={styles.togglePassBtn}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {POPULAR_SPECIALIZATIONS.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Contact Phone</label>
-                  <input
-                    type="tel"
-                    value={doctorPhone}
-                    onChange={(e) => setDoctorPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="form-control"
-                  />
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
+            </div>
 
-              <div className="form-group" style={{ marginBottom: "1rem" }}>
-                <label className="form-label">Medical Qualifications *</label>
-                <input
-                  type="text"
-                  required
-                  value={qualifications}
-                  onChange={(e) => setQualifications(e.target.value)}
-                  placeholder="e.g. MBBS, MD (Cardiology) - Harvard Medical School"
-                  className="form-control"
-                />
-              </div>
+            <button
+              type="submit"
+              disabled={submitting}
+              className={`btn btn-primary ${styles.submitBtn}`}
+            >
+              {submitting ? (
+                <div className="spinner" style={{ width: "1.2rem", height: "1.2rem", color: "white" }} />
+              ) : (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                  <UserCheck size={17} />
+                  <span>
+                    {roleTab === "patient" ? "Create Patient Account" : "Submit Doctor Registration"}
+                  </span>
+                </span>
+              )}
+            </button>
+          </form>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                <div className="form-group">
-                  <label className="form-label">Experience (Years)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={70}
-                    value={experienceYears}
-                    onChange={(e) => setExperienceYears(e.target.value)}
-                    className="form-control"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Consultation Fee (₹ INR)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={consultationFee}
-                    onChange={(e) => setConsultationFee(e.target.value)}
-                    className="form-control"
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          <div className={styles.securityNote}>
+            <ShieldCheck size={14} color="var(--success)" />
+            <span>Certified medical confidentiality and protected healthcare data</span>
+          </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="btn btn-primary"
-            style={{ width: "100%", padding: "0.85rem", marginTop: "1rem", fontSize: "1rem" }}
-          >
-            {submitting ? <div className="spinner" /> : `Create ${roleTab === "doctor" ? "Doctor" : "Patient"} Account`}
-          </button>
-        </form>
-
-        <div style={{ textAlign: "center", marginTop: "1.75rem", fontSize: "0.88rem", color: "var(--text-secondary)" }}>
-          Already have an account?{" "}
-          <Link to="/login" style={{ color: "var(--primary)", fontWeight: 700 }}>
-            Sign In
-          </Link>
+          <div className={styles.footerPrompt}>
+            Already have an account?
+            <Link to="/login">Sign in here</Link>
+          </div>
         </div>
       </div>
     </div>

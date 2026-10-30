@@ -1,7 +1,7 @@
 import React from "react";
-import { Printer, Calendar, ShieldCheck, Heart, FileText, CheckCircle2 } from "lucide-react";
+import { Printer, Calendar, ShieldCheck, Heart, FileText, CheckCircle2, Edit3 } from "lucide-react";
 
-const PrescriptionCard = ({ prescription, onClose }) => {
+const PrescriptionCard = ({ prescription, onClose, onEdit }) => {
   if (!prescription) return null;
 
   return (
@@ -55,6 +55,19 @@ const PrescriptionCard = ({ prescription, onClose }) => {
             </span>
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
+            {onEdit && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit(prescription);
+                }}
+                className="btn btn-outline"
+                style={{ padding: "0.35rem 0.75rem", fontSize: "0.8rem", gap: "0.3rem", color: "var(--primary)" }}
+              >
+                <Edit3 size={14} />
+                <span>Edit Prescription</span>
+              </button>
+            )}
             <button
               onClick={() => window.print()}
               className="btn btn-outline"

@@ -1,149 +1,241 @@
 .layout {
   display: flex;
   min-height: 100vh;
-  background-color: var(--bg-page);
+  background-color: var(--bg-app);
 }
 
 .sidebar {
-  width: 260px;
-  background-color: #FFFFFF;
-  border-right: 1px solid var(--border);
+  width: 250px;
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
-  position: fixed;
+  height: 100vh;
+  position: sticky;
   top: 0;
-  bottom: 0;
   left: 0;
+  flex-shrink: 0;
+  border-right: 1px solid #1e293b;
   z-index: 40;
 }
 
 .sidebarBrand {
-  height: 4.5rem;
-  padding: 0 1.5rem;
+  padding: 20px 20px 16px 20px;
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--primary);
+  gap: 12px;
+  border-bottom: 1px solid #1e293b;
+  text-decoration: none;
 }
 
 .brandIcon {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: white;
-  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+}
+
+.brandInfo {
+  overflow: hidden;
+}
+
+.brandTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brandType {
+  font-size: 0.725rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
 .navSection {
   flex: 1;
-  padding: 1.5rem 1rem;
+  padding: 16px 12px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .navRoleLabel {
-  font-size: 0.72rem;
+  font-size: 0.725rem;
   text-transform: uppercase;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  padding: 0 0.75rem 0.6rem;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  padding: 6px 14px;
+  margin-bottom: 4px;
 }
 
 .navList {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 4px;
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--sidebar-text);
+  text-decoration: none;
+  font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease-in-out;
 }
 
 .navItem:hover {
-  background-color: var(--bg-page);
-  color: var(--primary);
+  background-color: var(--sidebar-hover);
+  color: #ffffff;
 }
 
 .navItemActive {
-  background-color: var(--primary-light);
-  color: var(--primary);
+  background-color: var(--sidebar-active) !important;
+  color: #ffffff !important;
   font-weight: 600;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
 
 .userFooter {
-  padding: 1rem 1.25rem;
-  border-top: 1px solid var(--border);
+  padding: 16px 20px;
+  border-top: 1px solid #1e293b;
+  background-color: #0b1120;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #FAFAFA;
+  gap: 10px;
 }
 
 .userMeta {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.userAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: #1e293b;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border: 1px solid #334155;
+  flex-shrink: 0;
+}
+
+.userText {
   overflow: hidden;
 }
 
 .userEmail {
-  font-size: 0.85rem;
+  font-size: 0.825rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: block;
+}
+
+.userRoleTag {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: capitalize;
+}
+
+.logoutBtn {
+  color: #94a3b8;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  background: none;
+}
+
+.logoutBtn:hover {
+  background: #1e293b;
+  color: #ef4444;
+  border-color: #334155;
 }
 
 .mainWrapper {
   flex: 1;
-  margin-left: 260px;
+  min-width: 0;
+  background-color: var(--bg-app);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
 
 .topBar {
-  height: 4.5rem;
-  background-color: #FFFFFF;
+  height: 64px;
+  padding: 0 32px;
+  background-color: #ffffff;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2rem;
   position: sticky;
   top: 0;
   z-index: 30;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.topBarTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
 }
 
 .contentArea {
-  flex: 1;
-  padding: 2rem;
-  max-width: 1400px;
-  width: 100%;
+  padding: 28px 32px;
+  max-width: 1360px;
   margin: 0 auto;
+  width: 100%;
+  flex: 1;
 }
 
 @media (max-width: 900px) {
   .sidebar {
-    width: 200px;
+    width: 72px;
   }
-  .mainWrapper {
-    margin-left: 200px;
+  .brandInfo, .navRoleLabel, .navItem span, .userText {
+    display: none;
+  }
+  .navItem {
+    justify-content: center;
+    padding: 12px;
+  }
+  .topBar, .contentArea {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }

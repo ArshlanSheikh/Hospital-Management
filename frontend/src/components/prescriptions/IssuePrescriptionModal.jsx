@@ -1,19 +1,54 @@
 import React, { useState } from "react";
-import { X, FileText, Plus, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { X, FileText, Plus, Trash2, AlertCircle, Save, CheckCircle2 } from "lucide-react";
 import apiClient from "../../api/client";
 
-const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) => {
-  const [diagnosis, setDiagnosis] = useState("");
-  const [bp, setBp] = useState("120/80");
-  const [pulse, setPulse] = useState("72 bpm");
-  const [weight, setWeight] = useState("");
-  const [temp, setTemp] = useState("98.6 F");
-  const [medicines, setMedicines] = useState([
-    { name: "", dosage: "", frequency: "Once daily (Morning)", duration: "7 days", instructions: "After food" }
-  ]);
-  const [tests, setTests] = useState("");
-  const [adviceNotes, setAdviceNotes] = useState("");
-  const [followUpDate, setFollowUpDate] = useState("");
+const IssuePrescriptionModal = ({
+  appointment,
+  existingPrescription = null,
+  onClose,
+  onPrescriptionIssued
+}) => {
+  const isEditMode = Boolean(existingPrescription);
+
+  const [diagnosis, setDiagnosis] = useState(
+    existingPrescription?.diagnosis || ""
+  );
+  const [bp, setBp] = useState(
+    existingPrescription?.vital_signs?.blood_pressure || "120/80"
+  );
+  const [pulse, setPulse] = useState(
+    existingPrescription?.vital_signs?.pulse || "72 bpm"
+  );
+  const [weight, setWeight] = useState(
+    existingPrescription?.vital_signs?.weight || ""
+  );
+  const [temp, setTemp] = useState(
+    existingPrescription?.vital_signs?.temperature || "98.6 F"
+  );
+  const [medicines, setMedicines] = useState(
+    existingPrescription?.medicines?.length
+      ? existingPrescription.medicines
+      : [
+          {
+            name: "",
+            dosage: "500mg",
+            frequency: "Twice daily (Morning & Night)",
+            duration: "5 days",
+            instructions: "After food"
+          }
+        ]
+  );
+  const [tests, setTests] = useState(
+    Array.isArray(existingPrescription?.tests_recommended)
+      ? existingPrescription.tests_recommended.join(", ")
+      : ""
+  );
+  const [adviceNotes, setAdviceNotes] = useState(
+    existingPrescription?.advice_notes || ""
+  );
+  const [followUpDate, setFollowUpDate] = useState(
+    existingPrescription?.follow_up_date || ""
+  );
   const [markCompleted, setMarkCompleted] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -21,7 +56,13 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
   const handleAddMedicine = () => {
     setMedicines([
       ...medicines,
-      { name: "", dosage: "", frequency: "Twice daily (Morning & Night)", duration: "5 days", instructions: "After food" }
+      {
+        name: "",
+        dosage: "",
+        frequency: "Once daily (Morning)",
+        duration: "7 days",
+        instructions: "After food"
+      }
     ]);
   };
 
@@ -40,45 +81,81 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
     e.preventDefault();
     setError(null);
 
-    // Validation
-    const validMedicines = medicines.filter((m) => m.name.trim() !== "");
+    const validMedicines = medicines.filter((m) => m.name && m.name.trim() !== "");
     if (validMedicines.length === 0) {
-      setError("Please prescribe at least one medication with a valid name.");
+      setError("Please prescribe at least one medication with a valid medicine name.");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const payload = {
-        appointment_id: appointment.id || appointment._id,
-        diagnosis: diagnosis || "General Medical Evaluation",
-        vital_signs: {
-          blood_pressure: bp,
-          pulse: pulse,
-          weight: weight,
-          temperature: temp
-        },
-        medicines: validMedicines,
-        tests_recommended: tests ? tests.split(",").map((t) => t.trim()).filter(Boolean) : [],
-        advice_notes: adviceNotes,
-        follow_up_date: followUpDate || null,
-        mark_appointment_completed: markCompleted
-      };
+      if (isEditMode) {
+        const updatePayload = {
+          diagnosis: diagnosis || "General Medical Evaluation",
+          vital_signs: {
+            blood_pressure: bp,
+            pulse: pulse,
+            weight: weight,
+            temperature: temp
+          },
+          medicines: validMedicines,
+          tests_recommended: tests
+            ? tests.split(",").map((t) => t.trim()).filter(Boolean)
+            : [],
+          advice_notes: adviceNotes,
+          follow_up_date: followUpDate || null
+        };
 
-      const res = await apiClient.post("/prescriptions", payload);
-      if (res.data?.success) {
+        const res = await apiClient.put(`/prescriptions/${existingPrescription.id}`, updatePayload);
+        const rxResult = res.data || res;
         if (onPrescriptionIssued) {
-          onPrescriptionIssued(res.data.data);
+          onPrescriptionIssued(rxResult);
+        }
+        onClose();
+      } else {
+        const createPayload = {
+          appointment_id: appointment?.id || appointment?._id,
+          diagnosis: diagnosis || "General Medical Evaluation",
+          vital_signs: {
+            blood_pressure: bp,
+            pulse: pulse,
+            weight: weight,
+            temperature: temp
+          },
+          medicines: validMedicines,
+          tests_recommended: tests
+            ? tests.split(",").map((t) => t.trim()).filter(Boolean)
+            : [],
+          advice_notes: adviceNotes,
+          follow_up_date: followUpDate || null,
+          mark_appointment_completed: markCompleted
+        };
+
+        const res = await apiClient.post("/prescriptions", createPayload);
+        const rxResult = res.data || res;
+        if (onPrescriptionIssued) {
+          onPrescriptionIssued(rxResult);
         }
         onClose();
       }
     } catch (err) {
-      setError(err.response?.data?.error?.message || "Failed to issue prescription");
+      setError(err.message || "Failed to save prescription");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const patientName =
+    appointment?.patient_name ||
+    existingPrescription?.patient_name ||
+    "Patient";
+
+  const apptRef =
+    appointment?.appointment_number ||
+    existingPrescription?.appointment_number ||
+    existingPrescription?.prescription_number ||
+    "";
 
   return (
     <div
@@ -88,7 +165,7 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(15, 23, 42, 0.65)",
+        backgroundColor: "rgba(15, 23, 42, 0.7)",
         backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
@@ -103,8 +180,8 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
           background: "white",
           borderRadius: "16px",
           width: "100%",
-          maxWidth: "680px",
-          maxHeight: "90vh",
+          maxWidth: "740px",
+          maxHeight: "92vh",
           boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           overflow: "hidden",
           display: "flex",
@@ -123,33 +200,43 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
             background: "#f8fafc"
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <div
               style={{
-                width: "36px",
-                height: "36px",
+                width: "40px",
+                height: "40px",
                 borderRadius: "10px",
-                background: "rgba(139, 92, 246, 0.1)",
-                color: "#7c3aed",
+                background: "rgba(10, 77, 104, 0.1)",
+                color: "var(--primary)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center"
               }}
             >
-              <FileText size={20} />
+              <FileText size={22} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#0f172a" }}>
-                Issue Digital Prescription (Rx)
+              <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700, color: "#0f172a" }}>
+                {isEditMode
+                  ? `Edit Prescription (${existingPrescription.prescription_number})`
+                  : "Issue Digital Prescription (Rx)"}
               </h3>
-              <p style={{ margin: 0, fontSize: "0.8rem", color: "#64748b" }}>
-                Patient: {appointment?.patient_name || "Patient"} &bull; Ref: {appointment?.appointment_number}
+              <p style={{ margin: "2px 0 0", fontSize: "0.82rem", color: "#64748b" }}>
+                Patient: <strong>{patientName}</strong> &bull; Ref: <code style={{ fontSize: "0.82rem" }}>{apptRef}</code>
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#94a3b8",
+              cursor: "pointer",
+              padding: "6px",
+              borderRadius: "6px"
+            }}
+            aria-label="Close"
           >
             <X size={20} />
           </button>
@@ -169,7 +256,7 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
                 gap: "0.5rem",
                 alignItems: "center",
                 fontSize: "0.85rem",
-                marginBottom: "1rem"
+                marginBottom: "1.25rem"
               }}
             >
               <AlertCircle size={16} style={{ flexShrink: 0 }} />
@@ -184,11 +271,11 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
             </label>
             <input
               type="text"
-              placeholder="e.g. Acute Bronchitis, Essential Hypertension"
+              placeholder="e.g. Acute Bronchitis, Essential Hypertension, Viral Pharyngitis"
               value={diagnosis}
               onChange={(e) => setDiagnosis(e.target.value)}
               className="form-control"
-              style={{ width: "100%", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+              style={{ width: "100%", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid #cbd5e1" }}
               required
             />
           </div>
@@ -198,45 +285,45 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
             <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
               Patient Vitals
             </label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.75rem" }}>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Blood Pressure</span>
+                <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block", marginBottom: "2px" }}>Blood Pressure</span>
                 <input
                   type="text"
                   placeholder="120/80"
                   value={bp}
                   onChange={(e) => setBp(e.target.value)}
-                  style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                  style={{ width: "100%", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                 />
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Pulse / HR</span>
+                <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block", marginBottom: "2px" }}>Pulse Rate</span>
                 <input
                   type="text"
                   placeholder="72 bpm"
                   value={pulse}
                   onChange={(e) => setPulse(e.target.value)}
-                  style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                  style={{ width: "100%", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                 />
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Weight (kg)</span>
+                <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block", marginBottom: "2px" }}>Weight</span>
                 <input
                   type="text"
                   placeholder="65 kg"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
-                  style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                  style={{ width: "100%", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                 />
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Temp</span>
+                <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block", marginBottom: "2px" }}>Temperature</span>
                 <input
                   type="text"
                   placeholder="98.6 F"
                   value={temp}
                   onChange={(e) => setTemp(e.target.value)}
-                  style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                  style={{ width: "100%", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                 />
               </div>
             </div>
@@ -252,7 +339,7 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
                 type="button"
                 onClick={handleAddMedicine}
                 className="btn btn-outline"
-                style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem", gap: "0.3rem" }}
+                style={{ padding: "0.3rem 0.65rem", fontSize: "0.78rem", gap: "0.3rem" }}
               >
                 <Plus size={14} /> Add Medicine
               </button>
@@ -264,11 +351,11 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
                   key={idx}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "2.5fr 1.2fr 2fr 1.2fr 2fr auto",
-                    gap: "0.4rem",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr)) auto",
+                    gap: "0.5rem",
                     alignItems: "center",
                     background: "#f8fafc",
-                    padding: "0.5rem",
+                    padding: "0.65rem",
                     borderRadius: "8px",
                     border: "1px solid #e2e8f0"
                   }}
@@ -278,36 +365,36 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
                     placeholder="Medicine Name *"
                     value={med.name}
                     onChange={(e) => handleMedicineChange(idx, "name", e.target.value)}
-                    style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                    style={{ padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem", minWidth: "120px" }}
                     required
                   />
                   <input
                     type="text"
-                    placeholder="Dosage (500mg)"
+                    placeholder="Dosage (e.g. 500mg)"
                     value={med.dosage}
                     onChange={(e) => handleMedicineChange(idx, "dosage", e.target.value)}
-                    style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                    style={{ padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                   />
                   <input
                     type="text"
                     placeholder="Frequency"
                     value={med.frequency}
                     onChange={(e) => handleMedicineChange(idx, "frequency", e.target.value)}
-                    style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                    style={{ padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                   />
                   <input
                     type="text"
-                    placeholder="Duration"
+                    placeholder="Duration (e.g. 5 days)"
                     value={med.duration}
                     onChange={(e) => handleMedicineChange(idx, "duration", e.target.value)}
-                    style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                    style={{ padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                   />
                   <input
                     type="text"
-                    placeholder="Instructions"
+                    placeholder="Instructions (e.g. After food)"
                     value={med.instructions}
                     onChange={(e) => handleMedicineChange(idx, "instructions", e.target.value)}
-                    style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                    style={{ padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                   />
                   <button
                     type="button"
@@ -318,9 +405,10 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
                       border: "none",
                       color: medicines.length <= 1 ? "#cbd5e1" : "#ef4444",
                       cursor: medicines.length <= 1 ? "default" : "pointer",
-                      padding: "4px"
+                      padding: "6px",
+                      borderRadius: "6px"
                     }}
-                    title="Remove"
+                    title="Remove medicine"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -330,14 +418,14 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
           </div>
 
           {/* Advice & Tests */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
             <div>
               <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
                 Diagnostic Tests Recommended
               </label>
               <input
                 type="text"
-                placeholder="e.g. CBC, Serum Creatinine, ECG"
+                placeholder="e.g. CBC, Lipid Profile, ECG, X-Ray Chest"
                 value={tests}
                 onChange={(e) => setTests(e.target.value)}
                 style={{ width: "100%", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
@@ -345,7 +433,7 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
             </div>
             <div>
               <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
-                Follow-Up Date
+                Follow-Up Consultation Date
               </label>
               <input
                 type="date"
@@ -358,28 +446,31 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
-              General Advice & Dietary Instructions
+              Clinical Advice & Dietary Instructions
             </label>
             <textarea
-              rows={2}
-              placeholder="e.g. Drink plenty of warm water, avoid oily food, complete antibiotic course."
+              rows={3}
+              placeholder="e.g. Drink plenty of warm water, avoid sodium-heavy food, complete full antibiotic regimen, rest for 3 days."
               value={adviceNotes}
               onChange={(e) => setAdviceNotes(e.target.value)}
               style={{ width: "100%", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
             />
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.5rem" }}>
-            <input
-              type="checkbox"
-              id="markCompleted"
-              checked={markCompleted}
-              onChange={(e) => setMarkCompleted(e.target.checked)}
-            />
-            <label htmlFor="markCompleted" style={{ fontSize: "0.85rem", color: "#475569", cursor: "pointer" }}>
-              Mark this consultation as officially completed upon issuing prescription
-            </label>
-          </div>
+          {!isEditMode && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.5rem" }}>
+              <input
+                type="checkbox"
+                id="markCompleted"
+                checked={markCompleted}
+                onChange={(e) => setMarkCompleted(e.target.checked)}
+                style={{ cursor: "pointer" }}
+              />
+              <label htmlFor="markCompleted" style={{ fontSize: "0.85rem", color: "#475569", cursor: "pointer" }}>
+                Mark this consultation as officially <strong>Completed</strong> upon issuing prescription
+              </label>
+            </div>
+          )}
 
           {/* Actions */}
           <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
@@ -390,10 +481,12 @@ const IssuePrescriptionModal = ({ appointment, onClose, onPrescriptionIssued }) 
               type="submit"
               disabled={submitting}
               className="btn btn-primary"
-              style={{ minWidth: "160px", justifyContent: "center" }}
+              style={{ minWidth: "170px", justifyContent: "center" }}
             >
               {submitting ? (
                 <div className="spinner" style={{ width: "1.2rem", height: "1.2rem", color: "white" }} />
+              ) : isEditMode ? (
+                "Save & Update Rx"
               ) : (
                 "Issue Digital Prescription"
               )}

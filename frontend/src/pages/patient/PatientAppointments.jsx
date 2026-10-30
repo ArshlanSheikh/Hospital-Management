@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Calendar,
   Clock,
@@ -10,7 +10,8 @@ import {
   CreditCard,
   Video,
   FileText,
-  RotateCw
+  RotateCw,
+  PhoneCall
 } from "lucide-react";
 import apiClient from "../../api/client";
 import { useToast } from "../../context/ToastContext";
@@ -33,23 +34,37 @@ const PatientAppointments = () => {
   const [loadingRx, setLoadingRx] = useState(false);
 
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
 
-  const fetchAppointments = async () => {
-    setLoading(true);
+  const fetchAppointments = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const url = activeTab === "all" ? "/appointments?limit=50" : `/appointments?status=${activeTab}&limit=50`;
       const res = await apiClient.get(url);
       setAppointments(res.data?.data?.appointments || res.data?.appointments || []);
     } catch (err) {
-      showError(err.message || "Failed to fetch appointments");
+      if (showSpinner) showError(err.message || "Failed to fetch appointments");
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAppointments();
+    fetchAppointments(true);
+    const interval = setInterval(() => {
+      fetchAppointments(false);
+    }, 4000);
+    return () => clearInterval(interval);
   }, [activeTab]);
+
+  const handleAcceptCall = async (appt) => {
+    try {
+      await apiClient.post(`/consultations/${appt.id}/accept-call`);
+    } catch (e) {
+      // Non-fatal
+    }
+    navigate(`/consultation/${appt.id}`);
+  };
 
   const handleCancelSubmit = async (e) => {
     e.preventDefault();
@@ -255,24 +270,73 @@ const PatientAppointments = () => {
                       </button>
                     )}
 
-                    {/* Join Video Call Button */}
-                    {isOnline && status === "confirmed" && (
-                      <Link
-                        to={`/consultation/${appt.id}`}
-                        className="btn"
-                        style={{
-                          background: "#088395",
-                          color: "white",
-                          fontSize: "0.85rem",
-                          padding: "0.4rem 0.85rem",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "0.4rem"
-                        }}
-                      >
-                        <Video size={15} />
-                        <span>Join Video Room</span>
-                      </Link>
+                    {/* Video Consultation Actions (Phase V2) */}
+                    {isOnline && status !== "cancelled" && status !== "rejected" && (
+                      <>
+                        {/* 1. Doctor is actively ringing right now -> pulsing button to Accept & Join */}
+                        {appt.call_status === "calling" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptCall(appt)}
+                            className="btn"
+                            style={{
+                              background: "linear-gradient(135deg, #10b981, #059669)",
+                              color: "white",
+                              fontSize: "0.85rem",
+                              padding: "0.45rem 1rem",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.45rem",
+                              fontWeight: 700,
+                              border: "none",
+                              cursor: "pointer",
+                              boxShadow: "0 0 15px rgba(16, 185, 129, 0.6)",
+                              animation: "pulse 1.5s infinite"
+                            }}
+                          >
+                            <PhoneCall size={15} />
+                            <span>Doctor Calling - Join Now</span>
+                          </button>
+                        ) : (appt.consultation_status === "in_progress" || appt.call_status === "connected") ? (
+                          /* 2. Call in progress or accidentally dropped -> Rejoin button */
+                          <Link
+                            to={`/consultation/${appt.id}`}
+                            className="btn"
+                            style={{
+                              background: "#088395",
+                              color: "white",
+                              fontSize: "0.85rem",
+                              padding: "0.45rem 1rem",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.45rem",
+                              fontWeight: 600
+                            }}
+                          >
+                            <Video size={15} />
+                            <span>Rejoin Video Call</span>
+                          </Link>
+                        ) : status === "confirmed" ? (
+                          /* 3. Patient cannot initiate call -> Informative badge */
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.4rem",
+                              fontSize: "0.82rem",
+                              padding: "0.4rem 0.8rem",
+                              borderRadius: "var(--radius-sm)",
+                              backgroundColor: "#f0fdf4",
+                              border: "1px solid #bbf7d0",
+                              color: "#166534",
+                              fontWeight: 500
+                            }}
+                          >
+                            <Clock size={14} color="#16a34a" />
+                            <span>Waiting for Doctor to Call</span>
+                          </div>
+                        ) : null}
+                      </>
                     )}
 
                     {/* View Prescription Button */}

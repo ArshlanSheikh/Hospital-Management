@@ -59,11 +59,15 @@ export const AuthProvider = ({ children }) => {
     return receivedUser;
   };
 
-  const logout = () => {
-    localStorage.removeItem("medipulse_token");
-    setToken(null);
-    setUser(null);
-    window.location.href = "/login";
+  const logout = async () => {
+    try {
+      await apiClient.post("/auth/logout").catch(() => {});
+    } finally {
+      localStorage.removeItem("medipulse_token");
+      setToken(null);
+      setUser(null);
+      window.location.href = "/login";
+    }
   };
 
   const refreshUser = async () => {

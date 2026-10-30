@@ -20,6 +20,7 @@ def app():
         db.notifications.delete_many({})
         db.payments.delete_many({})
         db.prescriptions.delete_many({})
+        db.consultation_signals.delete_many({})
         yield app
         # Clean up after test run
         db.users.delete_many({})
@@ -29,6 +30,7 @@ def app():
         db.notifications.delete_many({})
         db.payments.delete_many({})
         db.prescriptions.delete_many({})
+        db.consultation_signals.delete_many({})
 
 
 @pytest.fixture

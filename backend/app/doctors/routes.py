@@ -34,7 +34,8 @@ def get_doctor_availability(doctor_id):
     date_str = request.args.get("date")
     if not date_str:
         raise ValidationError("Query parameter 'date' (YYYY-MM-DD) is required")
-    slots = DoctorService.get_available_slots(doctor_id, date_str)
+    only_avail = request.args.get("available_only", "false").lower() in ["true", "1"]
+    slots = DoctorService.get_available_slots(doctor_id, date_str, only_available=only_avail)
     return success_response(data=slots, message="Available slots retrieved successfully")
 
 

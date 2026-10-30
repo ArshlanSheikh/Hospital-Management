@@ -2,7 +2,7 @@ from datetime import datetime, date, timezone
 from bson import ObjectId
 from app.extensions import get_db
 from app.doctors.repository import DoctorRepository
-from app.doctors.service import time_to_minutes, minutes_to_time
+from app.doctors.service import time_to_minutes, minutes_to_time, DoctorService
 from app.appointments.repository import AppointmentRepository
 from app.common.constants import (
     DoctorVerificationStatus,
@@ -43,30 +43,27 @@ class AppointmentService:
         if doctor.get("verification_status") != DoctorVerificationStatus.VERIFIED.value:
             raise ForbiddenError("This doctor is not currently verified to accept bookings.")
 
-        # 3. Check schedule settings
+        # 3. Check schedule settings with date overrides and weekly schedules
         settings = doctor.get("availability_settings") or {}
-        active_days = settings.get("days_of_week", [1, 2, 3, 4, 5])
-        if target_date.isoweekday() not in active_days:
-            raise ValidationError("Doctor does not consult on the selected day of the week.")
+        schedule = DoctorService.resolve_schedule_for_date(settings, target_date)
+        if not schedule.get("is_available"):
+            raise ValidationError(schedule.get("reason", "Doctor does not consult on the selected date."))
 
-        if date_str in settings.get("unavailable_dates", []):
-            raise ValidationError("Doctor has marked this specific date as unavailable.")
-
-        slot_duration = settings.get("slot_duration_minutes", 30)
+        slot_duration = schedule.get("slot_duration_minutes", 30)
         start_min = time_to_minutes(start_time_str)
         end_min = start_min + slot_duration
         end_time_str = minutes_to_time(end_min)
 
-        doc_start_min = time_to_minutes(settings.get("start_time", "09:00"))
-        doc_end_min = time_to_minutes(settings.get("end_time", "17:00"))
+        doc_start_min = time_to_minutes(schedule.get("start_time", "09:00"))
+        doc_end_min = time_to_minutes(schedule.get("end_time", "17:00"))
 
         if start_min < doc_start_min or end_min > doc_end_min:
-            raise ValidationError("Selected slot is outside the doctor's consultation hours.")
+            raise ValidationError("Selected slot is outside the doctor's consultation hours for this date.")
 
         # Check break time
-        if settings.get("break_start_time") and settings.get("break_end_time"):
-            b_start = time_to_minutes(settings["break_start_time"])
-            b_end = time_to_minutes(settings["break_end_time"])
+        if schedule.get("break_start_time") and schedule.get("break_end_time"):
+            b_start = time_to_minutes(schedule["break_start_time"])
+            b_end = time_to_minutes(schedule["break_end_time"])
             if not (end_min <= b_start or start_min >= b_end):
                 raise ValidationError("Selected slot falls during doctor's break period.")
 
@@ -77,16 +74,19 @@ class AppointmentService:
             if now_dt.hour > slot_h or (now_dt.hour == slot_h and now_dt.minute >= slot_m):
                 raise ValidationError("Cannot book a time slot that has already passed today.")
 
-        # 4. Check for existing active booking directly in database
+        # 4. Check for conflicting active bookings (exact and interval overlap)
         db = get_db()
-        existing = db.appointments.find_one({
-            "doctor_id": ObjectId(doctor_id),
+        active_appts = db.appointments.find({
+            "doctor_id": ObjectId(doctor_id) if ObjectId.is_valid(doctor_id) else doctor_id,
             "appointment_date": date_str,
-            "start_time": start_time_str,
             "appointment_status": {"$in": [AppointmentStatus.PENDING.value, AppointmentStatus.CONFIRMED.value]}
         })
-        if existing:
-            raise ConflictError("This time slot has already been booked. Please choose another time slot.")
+        for appt in active_appts:
+            a_start = time_to_minutes(appt["start_time"])
+            a_dur = appt.get("duration_minutes", slot_duration)
+            a_end = time_to_minutes(appt["end_time"]) if appt.get("end_time") else (a_start + a_dur)
+            if start_min < a_end and end_min > a_start:
+                raise ConflictError("This time slot has already been booked. Please choose another time slot.")
 
         # 5. Atomic insert with partial unique index protection
         now = datetime.now(timezone.utc)
@@ -207,27 +207,24 @@ class AppointmentService:
             raise NotFoundError("Doctor profile not found")
 
         settings = doctor.get("availability_settings") or {}
-        active_days = settings.get("days_of_week", [1, 2, 3, 4, 5])
-        if target_date.isoweekday() not in active_days:
-            raise ValidationError("Doctor does not consult on the selected day of the week.")
+        schedule = DoctorService.resolve_schedule_for_date(settings, target_date)
+        if not schedule.get("is_available"):
+            raise ValidationError(schedule.get("reason", "Doctor does not consult on the selected date."))
 
-        if new_date_str in settings.get("unavailable_dates", []):
-            raise ValidationError("Doctor has marked this specific date as unavailable.")
-
-        slot_duration = settings.get("slot_duration_minutes", 30)
+        slot_duration = schedule.get("slot_duration_minutes", 30)
         start_min = time_to_minutes(new_start_time_str)
         end_min = start_min + slot_duration
         new_end_time_str = minutes_to_time(end_min)
 
-        doc_start_min = time_to_minutes(settings.get("start_time", "09:00"))
-        doc_end_min = time_to_minutes(settings.get("end_time", "17:00"))
+        doc_start_min = time_to_minutes(schedule.get("start_time", "09:00"))
+        doc_end_min = time_to_minutes(schedule.get("end_time", "17:00"))
 
         if start_min < doc_start_min or end_min > doc_end_min:
-            raise ValidationError("Selected slot is outside doctor's consultation hours.")
+            raise ValidationError("Selected slot is outside doctor's consultation hours for this date.")
 
-        if settings.get("break_start_time") and settings.get("break_end_time"):
-            b_start = time_to_minutes(settings["break_start_time"])
-            b_end = time_to_minutes(settings["break_end_time"])
+        if schedule.get("break_start_time") and schedule.get("break_end_time"):
+            b_start = time_to_minutes(schedule["break_start_time"])
+            b_end = time_to_minutes(schedule["break_end_time"])
             if not (end_min <= b_start or start_min >= b_end):
                 raise ValidationError("Selected slot falls during doctor's break period.")
 
@@ -237,17 +234,20 @@ class AppointmentService:
             if now_dt.hour > slot_h or (now_dt.hour == slot_h and now_dt.minute >= slot_m):
                 raise ValidationError("Cannot book a time slot that has already passed today.")
 
-        # Check collision with other active appointments
+        # Check collision with other active appointments (interval overlap)
         db = get_db()
-        existing = db.appointments.find_one({
+        active_appts = db.appointments.find({
             "_id": {"$ne": ObjectId(appointment_id) if ObjectId.is_valid(appointment_id) else appointment_id},
             "doctor_id": ObjectId(doctor_id) if ObjectId.is_valid(doctor_id) else doctor_id,
             "appointment_date": new_date_str,
-            "start_time": new_start_time_str,
             "appointment_status": {"$in": [AppointmentStatus.PENDING.value, AppointmentStatus.CONFIRMED.value]}
         })
-        if existing:
-            raise ConflictError("This time slot has already been booked. Please choose another time slot.")
+        for appt in active_appts:
+            a_start = time_to_minutes(appt["start_time"])
+            a_dur = appt.get("duration_minutes", slot_duration)
+            a_end = time_to_minutes(appt["end_time"]) if appt.get("end_time") else (a_start + a_dur)
+            if start_min < a_end and end_min > a_start:
+                raise ConflictError("This time slot has already been booked. Please choose another time slot.")
 
         old_date = appointment.get("appointment_date")
         old_time = appointment.get("start_time")

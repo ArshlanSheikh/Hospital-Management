@@ -28,11 +28,9 @@ const RescheduleModal = ({ appointment, onClose, onRescheduleSuccess }) => {
       setError(null);
       setSelectedSlot("");
       try {
-        const res = await apiClient.get(`/doctors/${appointment.doctor_id}/availability?date=${newDate}`);
-        if (res.data?.success) {
-          const slots = res.data.data.slots || [];
-          setAvailableSlots(slots.filter((s) => s.is_available));
-        }
+        const res = await apiClient.get(`/doctors/${appointment.doctor_id}/availability?date=${newDate}&available_only=true`);
+        const slotsArray = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : (res.data?.slots || []));
+        setAvailableSlots(slotsArray.filter((s) => s.is_available !== false));
       } catch (err) {
         setError(err.response?.data?.error?.message || "Failed to load slots for this date");
         setAvailableSlots([]);
